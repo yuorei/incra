@@ -1,0 +1,50 @@
+openapi: 3.0.3
+info:
+  title: Sample API
+  version: 1.0.0
+
+servers:
+  - url: "http://localhost:8080"
+    description: "ローカル環境"
+  - url: "http://sample.com"
+    description: "本番環境"
+
+tags:
+  - name: "greeting"
+    description: "挨拶エンドポイント"
+
+paths:
+  /hello:
+    get:
+      tags: ["greeting"]
+      summary: Returns a greeting message.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/hello'
+  /goodbye:
+    get:
+      tags: ["greeting"]
+      summary: Returns a goodbye message.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/goodbye'
+components:
+  schemas:
+    hello:
+      type: object
+      properties:
+        message:
+          type: string
+    goodbye:
+      type: object
+      properties:
+        message:
+          type: string

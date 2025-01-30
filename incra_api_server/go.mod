@@ -1,4 +1,4 @@
-module test
+module github.com/yuorei/incra_api_server
 
 go 1.23.4
 
