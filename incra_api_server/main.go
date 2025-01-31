@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"os"
 
 	petstore "github.com/yuorei/incra_api_server/api/v1"
 
@@ -18,16 +19,21 @@ var echoLambda *echoadapter.EchoLambda
 // ServerImpl は generated.go で定義されたインターフェイスを実装する構造体です
 type ServerImpl struct{}
 
-// GetHello GetGreeting は /hello エンドポイントのハンドラー関数です
-func (s *ServerImpl) GetHello(ctx echo.Context) error {
-	hello := "Hello, World!"
-	return ctx.JSON(http.StatusOK, petstore.Hello{Message: &hello})
+func (s *ServerImpl) GetHealth(ctx echo.Context) error {
+	health := "OK"
+	return ctx.JSON(http.StatusOK, petstore.Health{Message: &health})
 }
 
-// GetGoodbye は /goodbye エンドポイントのハンドラー関数です
-func (s *ServerImpl) GetGoodbye(ctx echo.Context) error {
-	goodbye := "Goodbye, World!"
-	return ctx.JSON(http.StatusOK, petstore.Goodbye{Message: &goodbye})
+func (s *ServerImpl) GetInvoiceInvoiceId(ctx echo.Context, invoiceRequest petstore.InvoiceRequest) error {
+	return ctx.JSON(http.StatusOK, petstore.InvoiceResponse{
+		InvoiceId: invoiceRequest.InvoiceId,
+	})
+}
+
+func (s *ServerImpl) PostInvoice(ctx echo.Context) error {
+	return ctx.JSON(http.StatusOK, petstore.InvoiceResponse{
+		InvoiceId: new(string),
+	})
 }
 
 func init() {
@@ -48,6 +54,10 @@ func init() {
 
 	// generated.go で定義された RegisterHandlers 関数を使用してルートをセットアップ
 	petstore.RegisterHandlers(e, server)
+
+	if os.Getenv("LOCAL") == "true" {
+		e.Logger.Fatal(e.Start(":8080"))
+	}
 
 	echoLambda = echoadapter.New(e)
 }

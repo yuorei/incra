@@ -1,50 +1,150 @@
 openapi: 3.0.3
 info:
-  title: Sample API
+  title: Incra API Server
+  description: Incra API ServerのAPI仕様書です。
   version: 1.0.0
 
 servers:
+  - url: "https://{ランダム}.{考える}.ap-northeast-1.amazonaws.com/api"
+    description: "AWS Lambda本番環境"
   - url: "http://localhost:8080"
-    description: "ローカル環境"
-  - url: "http://sample.com"
-    description: "本番環境"
+    description: "ローカル開発環境"
 
 tags:
-  - name: "greeting"
-    description: "挨拶エンドポイント"
+  - name: "generate_invoice"
+    description: "請求書を生成するAPI"
 
 paths:
-  /hello:
+  /health:
     get:
-      tags: ["greeting"]
-      summary: Returns a greeting message.
+      tags: ["health"]
+      summary: サーバーのヘルスチェック
       responses:
         '200':
-          description: Successful response
+          description: Successful operation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/hello'
-  /goodbye:
-    get:
-      tags: ["greeting"]
-      summary: Returns a goodbye message.
+                $ref: '#/components/schemas/health'
+  /invoice:
+    post:
+      tags: ["generate_invoice"]
+      summary: 請求書を生成
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateInvoiceRequest'
+        required: true
       responses:
-        '200':
-          description: Successful response
+        '201':
+          description: Successful operation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/goodbye'
+                $ref: '#/components/schemas/GenerateInvoiceResponse' 
+        '400':
+          description: Invalid input
+  /invoice/{invoice_id}:
+    get:
+      tags: ["generate_invoice"]
+      summary: 請求書を取得
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          description: 請求書ID
+          schema:
+            $ref: '#/components/schemas/InvoiceRequest'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          description: Invalid ID supplied
+        '403':
+          description: Forbidden
+        '404':
+          description: Invoice not found
+
 components:
   schemas:
-    hello:
+    health:
       type: object
       properties:
         message:
           type: string
-    goodbye:
+    GenerateInvoiceRequest:
       type: object
       properties:
-        message:
+        billing_slack_user_id:
           type: string
+          description: "請求先のSlackのユーザーID"
+        amount:
+          type: integer
+          description: "請求金額 (円)"
+        issuer_slack_user_id:
+          type: string
+          description: "請求者のSlackのユーザーID"
+        due_date:
+          type: string
+          format: date
+          description: "支払い期限 (yyyyddmm)"
+        bank_details:
+          type: string
+          description: "振込先"
+        additional_info:
+          type: string
+          description: "その他の説明"
+    GenerateInvoiceResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: "請求書の生成に成功したかどうか"
+        invoice_id:
+          type: string
+          description: "請求書ID"
+    InvoiceRequest:
+      type: object
+      properties:
+        invoice_id:
+          type: string
+          description: "請求書ID"
+    InvoiceResponse:
+      type: object
+      properties:
+        invoice_id:
+          type: string
+          description: "請求書ID"
+        billing_slack_user_id:
+          type: string
+          description: "請求先のSlackのユーザーID"
+        billing_slack_real_name:
+          type: string
+          description: "請求先のSlackの本名"
+        issuer_slack_user_id:
+          type: string
+          description: "請求者のSlackのユーザーID"
+        issuer_slack_real_name:
+          type: string
+          description: "請求者のSlackの本名"
+        status:
+          type: string
+          description: "請求書のステータス"
+        paid_date:
+          type: string
+          format: date
+          description: "支払い日 (yyyyddmm)"
+        paid_amount:
+          type: integer
+          description: "支払い金額 (円)"
+        paid_method:
+          type: string
+          description: "支払い方法"
+        additional_info:
+          type: string
+          description: "その他の説明"
