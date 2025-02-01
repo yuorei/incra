@@ -2,9 +2,7 @@ package ui
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -53,9 +51,9 @@ func SlackEventsHandler(c echo.Context) error {
 
 	body, err := io.ReadAll(c.Request().Body)
 	if err != nil {
-		log.Println(err)
 		return err
 	}
+
 	eventsAPIEvent, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionNoVerifyToken())
 	if err != nil {
 		return err
@@ -78,7 +76,6 @@ func SlackEventsHandler(c echo.Context) error {
 			if len(message) < 2 {
 				return err
 			}
-			fmt.Println("Invalid message", message, len(message))
 			command := message[1]
 			switch command {
 			case "ping":
@@ -92,4 +89,21 @@ func SlackEventsHandler(c echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusOK)
+}
+
+func SlackSlashsHandler(c echo.Context) error {
+	slackToken := os.Getenv("SLACK_TOKEN")
+	api := slack.New(slackToken)
+
+	slashCommand, err := slack.SlashCommandParse(c.Request())
+	if err != nil {
+		return err
+	}
+
+	_, _, err = api.PostMessage(slashCommand.ChannelID, slack.MsgOptionText(slashCommand.Text, false))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

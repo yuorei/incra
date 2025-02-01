@@ -31,6 +31,7 @@ func init() {
 
 	// Slackイベントを受け取るエンドポイント
 	e.POST("/slack/events", ui.SlackEventsHandler)
+	e.POST("/slack/slashs", ui.SlackSlashsHandler)
 
 	// サーバーの実装インスタンスを作成
 	server := &ui.ServerImpl{}
