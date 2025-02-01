@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"net/http"
 	"os"
 
 	petstore "github.com/yuorei/incra_api_server/api/v1"
+	"github.com/yuorei/incra_api_server/src/ui"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -15,26 +15,6 @@ import (
 )
 
 var echoLambda *echoadapter.EchoLambda
-
-// ServerImpl は generated.go で定義されたインターフェイスを実装する構造体です
-type ServerImpl struct{}
-
-func (s *ServerImpl) GetHealth(ctx echo.Context) error {
-	health := "OK"
-	return ctx.JSON(http.StatusOK, petstore.Health{Message: &health})
-}
-
-func (s *ServerImpl) GetInvoiceInvoiceId(ctx echo.Context, invoiceRequest petstore.InvoiceRequest) error {
-	return ctx.JSON(http.StatusOK, petstore.InvoiceResponse{
-		InvoiceId: invoiceRequest.InvoiceId,
-	})
-}
-
-func (s *ServerImpl) PostInvoice(ctx echo.Context) error {
-	return ctx.JSON(http.StatusOK, petstore.InvoiceResponse{
-		InvoiceId: new(string),
-	})
-}
 
 func init() {
 	e := echo.New()
@@ -49,8 +29,11 @@ func init() {
 		AllowMethods: []string{echo.GET, echo.PUT, echo.POST, echo.DELETE},
 	}))
 
+	// Slackイベントを受け取るエンドポイント
+	e.POST("/slack/events", ui.SlackEventsHandler)
+
 	// サーバーの実装インスタンスを作成
-	server := &ServerImpl{}
+	server := &ui.ServerImpl{}
 
 	// generated.go で定義された RegisterHandlers 関数を使用してルートをセットアップ
 	petstore.RegisterHandlers(e, server)
