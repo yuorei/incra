@@ -5,5 +5,10 @@ gen:
 		-o ./api/v1/generated.go \
 		./petstore.yaml
 
-make run_local:
-	LOCAL=true go run main.go
+fmt:
+	gofmt -s -l -w .
+	go mod tidy
+
+dev:
+	docker compose up
+	
