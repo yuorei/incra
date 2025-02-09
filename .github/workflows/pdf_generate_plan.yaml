@@ -24,7 +24,6 @@ jobs:
       # src ディレクトリの内容を ZIP 圧縮して配置します。
       - name: Zip src directory
         run: |
-          cd pdf_generate/src
           zip -r pdf_generate/terraform/lambda/python_lambda.zip pdf_generate/src
 
       # Terraformのセットアップ
