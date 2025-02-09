@@ -91,7 +91,7 @@ resource "aws_iam_role_policy_attachment" "lambda_sqs_attach" {
 
 resource "aws_lambda_function" "python_lambda" {
   function_name = "python_handler"
-  filename      = "./lambda/python_lambda.zip" # ZIP化しておく
+  filename      = "./lambda/python_lambda.zip" # github actions で ZIP化
   handler       = "handler.lambda_handler"     # ハンドラ（例：handler.py内のlambda_handler関数）
   runtime       = "python3.10"                 # 3.10だとうまくいった
   role          = aws_iam_role.lambda_role.arn
