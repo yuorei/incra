@@ -21,7 +21,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install --platform manylinux2014_x86_64 --only-binary=:all: --implementation cp --target pdf_generate/src -r pdf_generate/src/requirements.txt
 
-      # src ディレクトリの内容を ZIP 圧縮
+      # src ディレクトリの内容を ZIP 圧縮して配置します。
       - name: Zip src directory
         run: |
           cd pdf_generate/src
