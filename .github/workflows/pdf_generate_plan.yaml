@@ -3,7 +3,7 @@ name: "PDF Generate Plan"
 on:
   pull_request:
     paths:
-      - incra_api_server/terraform/**
+      - pdf_generate/terraform/**
 jobs:
   terraform-plan:
     runs-on: ubuntu-latest
