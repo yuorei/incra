@@ -49,20 +49,20 @@ jobs:
 
       # Terraform Planの実行
       - name: Run terraform plan
-        # env:
-        #   FONT_NAME: ${{ secrets.FONT_NAME }}
-        #   FONT_PATH: ${{ secrets.FONT_PATH }}
-        #   R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
-        #   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        #   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        #   REGION_NAME: ${{ secrets.REGION_NAME }}
-        #   BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+        env:
+          FONT_NAME: フォント名
+          FONT_PATH: ${{ secrets.FONT_PATH }}
+          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          REGION_NAME: ${{ secrets.REGION_NAME }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
         id: plan
         # run: terraform plan -no-color -var "font_name=${FONT_NAME}" -var "font_path=${FONT_PATH}" -var "r2_endpoint_url=${R2_ENDPOINT_URL}" -var "aws_access_key_id=${AWS_ACCESS_KEY_ID}" -var "aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}" -var "region_name=${REGION_NAME}" -var "bucket_name=${BUCKET_NAME}"
         # run: terraform plan -no-color -var "font_name=test" -var "font_path=test" -var "r2_endpoint_url=test" -var "aws_access_key_id=test" -var "aws_secret_access_key=test" -var "region_name=test" -var "bucket_name=test"
         run: |
           terraform plan -no-color \
-            -var "font_name=test" \
+            -var "font_name=${FONT_NAME}" \
             -var "font_path=test" \
             -var "r2_endpoint_url=test" \
             -var "aws_access_key_id=test" \
