@@ -50,7 +50,7 @@ jobs:
       # Terraform Planの実行
       - name: Run terraform plan
         env:
-          FONT_NAME: フォント名
+          FONT_NAME:  ${{ secrets.TEST }} #${{ secrets.FONT_NAME }}
           FONT_PATH: ${{ secrets.FONT_PATH }}
           R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
