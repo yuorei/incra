@@ -54,15 +54,7 @@ jobs:
           REGION_NAME: ${{ secrets.REGION_NAME }}
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
         id: plan
-        run: |
-          terraform plan -no-color \
-            -var "font_name=${FONT_NAME}" \
-            -var "font_path=${FONT_PATH}" \
-            -var "r2_endpoint_url=${R2_ENDPOINT_URL}" \
-            -var "aws_access_key_id=${AWS_ACCESS_KEY_ID}" \
-            -var "aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}" \
-            -var "region_name=${REGION_NAME}" \
-            -var "bucket_name=${BUCKET_NAME}"
+        run: terraform plan -no-color -var "font_name=${FONT_NAME}" -var "font_path=${FONT_PATH}" -var "r2_endpoint_url=${R2_ENDPOINT_URL}" -var "aws_access_key_id=${AWS_ACCESS_KEY_ID}" -var "aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}" -var "region_name=${REGION_NAME}" -var "bucket_name=${BUCKET_NAME}"
 
       # Planの結果を整形してハイライト可能なdiff形式に変換
       - name: Reformat Plan
