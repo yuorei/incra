@@ -99,14 +99,14 @@ resource "aws_lambda_function" "python_lambda" {
   # 必要に応じて環境変数も設定可能
   environment {
     variables = {
-      ENV = "production"
-      FONT_NAME = var.font_name
-      FONT_PATH = var.font_path
-      R2_ENDPOINT_URL = var.r2_endpoint_url
-      AWS_ACCESS_KEY_ID = var.aws_access_key_id
+      ENV                   = "production"
+      FONT_NAME             = var.font_name
+      FONT_PATH             = var.font_path
+      R2_ENDPOINT_URL       = var.r2_endpoint_url
+      AWS_ACCESS_KEY_ID     = var.aws_access_key_id
       AWS_SECRET_ACCESS_KEY = var.aws_secret_access_key
-      REGION_NAME = var.region_name
-      BUCKET_NAME = var.bucket_name
+      REGION_NAME           = var.region_name
+      BUCKET_NAME           = var.bucket_name
     }
   }
 }
