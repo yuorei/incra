@@ -34,9 +34,13 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Check files
+        run: ls -la pdf_generate/terraform
+
       # Terraform Initの実行
       - name: Terraform Init
         run: terraform init
+        working-directory: pdf_generate/terraform
 
       # Terraform Validateの実行
       - name: Terraform Validate
@@ -55,7 +59,17 @@ jobs:
         #   BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
         id: plan
         # run: terraform plan -no-color -var "font_name=${FONT_NAME}" -var "font_path=${FONT_PATH}" -var "r2_endpoint_url=${R2_ENDPOINT_URL}" -var "aws_access_key_id=${AWS_ACCESS_KEY_ID}" -var "aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}" -var "region_name=${REGION_NAME}" -var "bucket_name=${BUCKET_NAME}"
-        run: terraform plan -no-color -var "font_name=test" -var "font_path=test" -var "r2_endpoint_url=test" -var "aws_access_key_id=test" -var "aws_secret_access_key=test" -var "region_name=test" -var "bucket_name=test"
+        # run: terraform plan -no-color -var "font_name=test" -var "font_path=test" -var "r2_endpoint_url=test" -var "aws_access_key_id=test" -var "aws_secret_access_key=test" -var "region_name=test" -var "bucket_name=test"
+        run: |
+          terraform plan -no-color \
+            -var "font_name=test" \
+            -var "font_path=test" \
+            -var "r2_endpoint_url=test" \
+            -var "aws_access_key_id=test" \
+            -var "aws_secret_access_key=test" \
+            -var "region_name=test" \
+            -var "bucket_name=test"
+        working-directory: pdf_generate/terraform
 
       # Planの結果を整形してハイライト可能なdiff形式に変換
       - name: Reformat Plan
