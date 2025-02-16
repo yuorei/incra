@@ -16,8 +16,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: get upstream branch
+        id: upstreambranch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::set-output name=branchname::$(curl -H "Authorization: token ${GITHUB_TOKEN}" ${{ github.event.issue.pull_request.url }} | jq '.head.ref' | sed 's/\"//g')"
+
+      - name: Checkout upstream branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.upstreambranch.outputs.branchname }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
