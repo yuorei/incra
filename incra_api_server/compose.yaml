@@ -8,7 +8,8 @@ services:
       - 8080:8080
     # Important to bind/mount your codebase dir to /app dir for live reload
     environment:
-      - SLACK_TOKEN=
       - LOCAL=true
+      - SLACK_TOKEN=
+      - QUEUE_URL=
     volumes:
       - ./:/app

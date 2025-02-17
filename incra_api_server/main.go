@@ -29,14 +29,12 @@ func init() {
 		AllowMethods: []string{echo.GET, echo.PUT, echo.POST, echo.DELETE},
 	}))
 
+	server := ui.NewServerImpl()
+
 	// Slackイベントを受け取るエンドポイント
-	e.POST("/slack/events", ui.SlackEventsHandler)
-	e.POST("/slack/slashs", ui.SlackSlashsHandler)
+	e.POST("/slack/events", server.SlackEventsHandler)
+	e.POST("/slack/slashs", server.SlackSlashsHandler)
 
-	// サーバーの実装インスタンスを作成
-	server := &ui.ServerImpl{}
-
-	// generated.go で定義された RegisterHandlers 関数を使用してルートをセットアップ
 	petstore.RegisterHandlers(e, server)
 
 	if os.Getenv("LOCAL") == "true" {

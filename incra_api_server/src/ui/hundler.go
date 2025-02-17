@@ -2,15 +2,18 @@ package ui
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	petstore "github.com/yuorei/incra_api_server/api/v1"
+	"github.com/yuorei/incra_api_server/src/domain"
 	"github.com/yuorei/incra_api_server/src/usecase"
 )
 
@@ -45,7 +48,7 @@ func (s *ServerImpl) PostInvoice(ctx echo.Context) error {
 	})
 }
 
-func SlackEventsHandler(c echo.Context) error {
+func (s *ServerImpl) SlackEventsHandler(c echo.Context) error {
 	slackToken := os.Getenv("SLACK_TOKEN")
 	api := slack.New(slackToken)
 
@@ -91,7 +94,7 @@ func SlackEventsHandler(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func SlackSlashsHandler(c echo.Context) error {
+func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
 	slackToken := os.Getenv("SLACK_TOKEN")
 	api := slack.New(slackToken)
 
@@ -99,6 +102,23 @@ func SlackSlashsHandler(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	now := time.Now()
+	fmt.Println(slashCommand)
+	invoice := domain.Invoice{
+		AdditionalInfo:       &slashCommand.Text,
+		BillingSlackRealName: &slashCommand.UserName,
+		BillingSlackUserId:   &slashCommand.UserID,
+		InvoiceId:            &slashCommand.Command,
+		IssuerSlackRealName:  &slashCommand.UserName,
+		IssuerSlackUserId:    &slashCommand.UserID,
+		PaidAmount:           new(int),
+		PaidDate:             &now,
+	}
+	res, err := s.invoiceUseCase.CreateInvoice(invoice)
+	if err != nil {
+		return err
+	}
+	fmt.Println(res)
 
 	_, _, err = api.PostMessage(slashCommand.ChannelID, slack.MsgOptionText(slashCommand.Text, false))
 	if err != nil {
