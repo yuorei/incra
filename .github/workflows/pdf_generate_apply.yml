@@ -2,11 +2,11 @@ name: Incra API Server Terraform Apply
 
 on:
   issue_comment:
-    types: [created]
+    types: [created, edited]
 
-permissions:
-  contents: read
-  pull-requests: write
+# permissions:
+#   contents: read
+#   pull-requests: write
 
 jobs:
   terraform-apply:
@@ -16,44 +16,46 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: get upstream branch
-        id: upstreambranch
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "::set-output name=branchname::$(curl -H "Authorization: token ${GITHUB_TOKEN}" ${{ github.event.issue.pull_request.url }} | jq '.head.ref' | sed 's/\"//g')"
+    - run: |
+        echo "アプライ (${{ github.event.comment.body }})"
+      # - name: get upstream branch
+      #   id: upstreambranch
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     echo "::set-output name=branchname::$(curl -H "Authorization: token ${GITHUB_TOKEN}" ${{ github.event.issue.pull_request.url }} | jq '.head.ref' | sed 's/\"//g')"
 
-      - name: Checkout upstream branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.upstreambranch.outputs.branchname }}
+      # - name: Checkout upstream branch
+      #   uses: actions/checkout@v4
+      #   with:
+      #     ref: ${{ steps.upstreambranch.outputs.branchname }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      # - name: Setup Terraform
+      #   uses: hashicorp/setup-terraform@v3
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+      # - name: Configure AWS credentials
+      #   uses: aws-actions/configure-aws-credentials@v3
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Initialize Terraform
-        run: terraform init
+      # - name: Initialize Terraform
+      #   run: terraform init
 
-      - name: Apply Terraform
-        run: terraform apply -auto-approve
+      # - name: Apply Terraform
+      #   run: terraform apply -auto-approve
 
-      - name: Comment on PR
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const prNumber = context.issue.number;
-            const comment = `Terraform Apply has been executed successfully. ✅`;
-            github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body: comment
-            });
+      # - name: Comment on PR
+      #   uses: actions/github-script@v7
+      #   with:
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     script: |
+      #       const prNumber = context.issue.number;
+      #       const comment = `Terraform Apply has been executed successfully. ✅`;
+      #       github.rest.issues.createComment({
+      #         owner: context.repo.owner,
+      #         repo: context.repo.repo,
+      #         issue_number: prNumber,
+      #         body: comment
+      #       });
