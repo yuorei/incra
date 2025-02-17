@@ -1,0 +1,15 @@
+services:
+  api:
+    build:
+      context: .
+      # Correct the path to your Dockerfile
+      dockerfile: Dockerfile
+    ports:
+      - 8080:8080
+    # Important to bind/mount your codebase dir to /app dir for live reload
+    environment:
+      - LOCAL=true
+      - SLACK_TOKEN=
+      - QUEUE_URL=
+    volumes:
+      - ./:/app

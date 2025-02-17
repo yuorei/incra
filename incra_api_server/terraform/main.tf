@@ -2,6 +2,16 @@ provider "aws" {
   region     = "ap-northeast-1"
 }
 
+variable "queue_url" {
+  description = "The URL of the SQS queue."
+  type        = string
+}
+
+variable "slack_token" {
+  description = "The token for Slack integration."
+  type        = string
+}
+
 # CloudWatch Logsへのアクセス権限
 resource "aws_iam_role_policy_attachment" "lambda_logs" {
   role       = aws_iam_role.lambda_exec.name
@@ -30,6 +40,8 @@ resource "aws_lambda_function" "incra-api-server-prod" {
   environment {
     variables = {
       STAGE = "prod"
+      QUEUE_URL = var.queue_url
+      SLACK_TOKEN = var.slack_token
     }
   }
 }
@@ -51,6 +63,29 @@ resource "aws_iam_role" "lambda_exec" {
     ],
   })
 }
+
+# LambdaからSQSへメッセージ送信を許可するポリシー
+resource "aws_iam_policy" "sqs_policy" {
+  name        = "lambda-sqs-policy"
+  description = "Lambda function can send messages to SQS"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action   = "sqs:SendMessage",
+        Effect   = "Allow",
+        Resource = "arn:aws:sqs:ap-northeast-1:438037648687:my-queue"
+      }
+    ]
+  })
+}
+
+# Lambda実行ロールに上記ポリシーをアタッチ
+resource "aws_iam_role_policy_attachment" "lambda_sqs_policy" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = aws_iam_policy.sqs_policy.arn
+}
+
 
 ## APIGateway
 resource "aws_api_gateway_rest_api" "incra-api-server-prod" {
@@ -104,6 +139,6 @@ variable "region" {
 }
 
 # API GatewayのエンドポイントURLを出力
-output "api_gateway_url" {
-  value = "https://${aws_api_gateway_rest_api.incra-api-server-prod.id}.execute-api.${var.region}.amazonaws.com/api"
-}
+# output "api_gateway_url" {
+#   value = "https://${aws_api_gateway_rest_api.incra-api-server-prod.id}.execute-api.${var.region}.amazonaws.com/api"
+# }
