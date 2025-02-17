@@ -2,7 +2,8 @@ name: Incra API Server Terraform Apply
 
 on:
   issue_comment:
-    - created
+    types: [created]
+
 
 # permissions:
 #   contents: read
