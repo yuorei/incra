@@ -13,7 +13,7 @@ jobs:
   terraform-apply:
     if: github.event_name == 'issue_comment' &&
         contains(github.event.comment.html_url, '/pull/') && 
-        startsWith(github.event.comment.body, '/apply') )
+        startsWith(github.event.comment.body, '/apply')
     runs-on: ubuntu-latest
 
     steps:
