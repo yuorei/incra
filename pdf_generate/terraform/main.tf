@@ -1,59 +1,59 @@
-variable "access_key" {
+variable "TF_VAR_access_key" {
   description = "AWS access key"
   type        = string
 }
 
-variable "secret_key" {
+variable "TF_VAR_secret_key" {
   description = "AWS secret key"
   type        = string
 }
 
-variable "region" {
+variable "TF_VAR_region" {
   description = "AWS region"
   type        = string
 }
 
 provider "aws" {
-  access_key = var.access_key
-  secret_key = var.secret_key
-  region     = var.region
+  access_key = var.TF_VAR_access_key
+  secret_key = var.TF_VAR_secret_key
+  region     = var.TF_VAR_region
 }
 
 resource "aws_sqs_queue" "my_queue" {
   name = "my-queue"
 }
 
-variable "font_name" {
+variable "TF_VAR_font_name" {
   description = "generate pdf font name"
   type        = string
 }
 
-variable "font_path" {
+variable "TF_VAR_font_path" {
   description = "generate pdf font path"
   type        = string
 }
 
-variable "r2_endpoint_url" {
+variable "TF_VAR_r2_endpoint_url" {
   description = "r2 endpoint url"
   type        = string
 }
 
-variable "aws_access_key_id" {
+variable "TF_VAR_aws_access_key_id" {
   description = "cloudflare r2  access key id"
   type        = string
 }
 
-variable "aws_secret_access_key" {
+variable "TF_VAR_aws_secret_access_key" {
   description = "cloudflare r2 secret access key"
   type        = string
 }
 
-variable "region_name" {
+variable "TF_VAR_region_name" {
   description = "region name"
   type        = string
 }
 
-variable "bucket_name" {
+variable "TF_VAR_bucket_name" {
   description = "bucket name"
   type        = string
 }
