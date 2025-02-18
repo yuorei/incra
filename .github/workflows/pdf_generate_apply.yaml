@@ -44,8 +44,8 @@ jobs:
 
       - name: Apply Terraform
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           FONT_NAME: ${{ secrets.FONT_NAME }}
           FONT_PATH: ${{ secrets.FONT_PATH }}
@@ -55,8 +55,8 @@ jobs:
           R2_REGION_NAME: ${{ secrets.REGION_NAME }}
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
         run: terraform apply -auto-approve \
-          -var "access_key"="${AWS_ACCESS_KEY_ID}" \
-          -var "secret_key"="${AWS_SECRET_ACCESS_KEY}" \
+          -var "access_key"="${AWS_ACCESS_KEY}" \
+          -var "secret_key"="${AWS_SECRET_ACCESS}" \
           -var "region"="${AWS_REGION}" \
           -var "font_name=${FONT_NAME}" \
           -var "font_path=${FONT_PATH}" \
