@@ -1,7 +1,22 @@
+variable "access_key" {
+  description = "AWS access key"
+  type        = string
+}
+
+variable "secret_key" {
+  description = "AWS secret key"
+  type        = string
+}
+
+variable "region" {
+  description = "AWS region"
+  type        = string
+}
+
 provider "aws" {
-  access_key = "AKIAWL7IUCUXY4EHI6TC"
-  secret_key = "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"
-  region     = "ap-northeast-1"
+  access_key = var.access_key
+  secret_key = var.secret_key
+  region     = var.region
 }
 
 resource "aws_sqs_queue" "my_queue" {
