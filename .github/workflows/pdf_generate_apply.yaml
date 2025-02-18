@@ -66,6 +66,7 @@ jobs:
             -var "aws_secret_access_key=${R2_SECRET_ACCESS_KEY}" \
             -var "region_name=${R2_REGION_NAME}" \
             -var "bucket_name=${BUCKET_NAME}"
+        working-directory: pdf_generate/terraform
 
       - name: Comment on PR
         uses: actions/github-script@v7
