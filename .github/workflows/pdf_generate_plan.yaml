@@ -60,6 +60,9 @@ jobs:
         id: plan
         run: |
           terraform plan -no-color \
+            -var "access_key"="test" \
+            -var "secret_key"="test" \
+            -var "region"="test" \
             -var "font_name=test" \
             -var "font_path=test" \
             -var "r2_endpoint_url=test" \
