@@ -1,11 +1,12 @@
+provider "aws" {
+  region     = var.region
+}
+
 variable "region" {
   description = "AWS region"
   type        = string
 }
 
-provider "aws" {
-  region     = var.region
-}
 
 resource "aws_sqs_queue" "my_queue" {
   name = "my-queue"
