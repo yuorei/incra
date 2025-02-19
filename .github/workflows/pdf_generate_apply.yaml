@@ -57,7 +57,7 @@ jobs:
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
         run: |
           terraform apply -auto-approve \
-            -var "region"=${AWS_REGION}" \
+            -var "region=${AWS_REGION}" \
             -var "font_name=${FONT_NAME}" \
             -var "font_path=${FONT_PATH}" \
             -var "r2_endpoint_url=${R2_ENDPOINT_URL}" \
