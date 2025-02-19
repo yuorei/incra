@@ -57,8 +57,6 @@ jobs:
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
         run: |
           terraform apply -auto-approve \
-            -var "access_key"="${AWS_ACCESS_KEY}" \
-            -var "secret_key"="${AWS_SECRET_ACCESS}" \
             -var "region"="${AWS_REGION}" \
             -var "font_name=${FONT_NAME}" \
             -var "font_path=${FONT_PATH}" \
