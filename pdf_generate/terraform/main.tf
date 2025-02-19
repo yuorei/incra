@@ -1,8 +1,8 @@
 provider "aws" {
-  region     = var.region
+  region     = var.region_aws
 }
 
-variable "region" {
+variable "region_aws" {
   description = "AWS region"
   type        = string
 }
