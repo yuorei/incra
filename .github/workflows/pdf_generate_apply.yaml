@@ -41,6 +41,7 @@ jobs:
 
       - name: Initialize Terraform
         run: terraform init
+        working-directory: pdf_generate/terraform
 
       - name: Apply Terraform
         env:
