@@ -19,12 +19,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: get upstream branch
+      - name: Get upstream branch
         id: upstreambranch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "::set-output name=branchname::$(curl -H "Authorization: token ${GITHUB_TOKEN}" ${{ github.event.issue.pull_request.url }} | jq '.head.ref' | sed 's/\"//g')"
+          branchname=$(curl -H "Authorization: token ${GITHUB_TOKEN}" \
+            ${{ github.event.issue.pull_request.url }} | jq -r '.head.ref')
+          echo "branchname=$branchname" >> $GITHUB_OUTPUT
 
       - name: Checkout upstream branch
         uses: actions/checkout@v4
@@ -32,7 +34,7 @@ jobs:
           ref: ${{ steps.upstreambranch.outputs.branchname }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1.7.0
+        uses: aws-actions/configure-aws-credentials@v1
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions
           aws-region: ap-northeast-1
@@ -40,22 +42,12 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
       - name: Initialize Terraform
         run: terraform init
         working-directory: pdf_generate/terraform
 
       - name: Apply Terraform
         env:
-          # AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          # AWS_SECRET_ACCESS: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          # AWS_REGION: ${{ secrets.AWS_REGION }}
           FONT_NAME: ${{ secrets.FONT_NAME }}
           FONT_PATH: ${{ secrets.FONT_PATH }}
           R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
@@ -63,15 +55,17 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_REGION_NAME: ${{ secrets.R2_REGION_NAME }}
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         run: |
           terraform apply -auto-approve \
             -var "font_name=${FONT_NAME}" \
             -var "font_path=${FONT_PATH}" \
             -var "r2_endpoint_url=${R2_ENDPOINT_URL}" \
-            -var "aws_access_key_id=${R2_ACCESS_KEY_ID}" \
-            -var "aws_secret_access_key=${R2_SECRET_ACCESS_KEY}" \
-            -var "region_name=${R2_REGION_NAME}" \
+            -var "r2_access_key_id=${R2_ACCESS_KEY_ID}" \
+            -var "r2_secret_access_key=${R2_SECRET_ACCESS_KEY}" \
+            -var "r2_region_name=${R2_REGION_NAME}" \
             -var "bucket_name=${BUCKET_NAME}"
+            -var "aws_account_id=${AWS_ACCOUNT_ID}"
         working-directory: pdf_generate/terraform
 
       - name: Comment on PR
