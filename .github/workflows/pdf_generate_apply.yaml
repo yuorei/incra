@@ -4,10 +4,12 @@ on:
   issue_comment:
     types: [created]
 
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-# permissions:
-#   contents: read
-#   pull-requests: write
+permissions:
+  id-token: write 
+  contents: read
 
 jobs:
   terraform-apply:
@@ -28,6 +30,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.upstreambranch.outputs.branchname }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1.7.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions
+          aws-region: ap-northeast-1
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
