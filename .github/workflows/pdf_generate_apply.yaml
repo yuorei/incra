@@ -34,7 +34,7 @@ jobs:
           ref: ${{ steps.upstreambranch.outputs.branchname }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1.7.0
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions
           aws-region: ap-northeast-1
