@@ -69,7 +69,8 @@ jobs:
             -var "r2_access_key_id=test" \
             -var "r2_secret_access_key=test" \
             -var "region_name=test" \
-            -var "bucket_name=test"
+            -var "bucket_name=test" \
+            -var "aws_account_id=test"
         working-directory: pdf_generate/terraform
 
       # Planの結果を整形してハイライト可能なdiff形式に変換
