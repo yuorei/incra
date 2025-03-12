@@ -66,8 +66,8 @@ jobs:
             -var "font_name=test" \
             -var "font_path=test" \
             -var "r2_endpoint_url=test" \
-            -var "aws_access_key_id=test" \
-            -var "aws_secret_access_key=test" \
+            -var "r2_access_key_id=test" \
+            -var "r2_secret_access_key=test" \
             -var "region_name=test" \
             -var "bucket_name=test"
         working-directory: pdf_generate/terraform
