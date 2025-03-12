@@ -41,6 +41,16 @@ variable "bucket_name" {
   type        = string
 }
 
+variable "r2_access_key_id" {
+  description = "r2 access key id"
+  type        = string
+}
+
+variable "r2_secret_access_key" {
+  description = "r2 secret access key"
+  type        = string
+}
+
 # Lambda用のIAMロール作成
 resource "aws_iam_role" "lambda_role" {
   name = "python_lambda_role"
@@ -101,6 +111,8 @@ resource "aws_lambda_function" "python_lambda" {
       R2_ENDPOINT_URL = var.r2_endpoint_url
       REGION_NAME     = var.region_name
       BUCKET_NAME     = var.bucket_name
+      R2_ACCESS_KEY_ID    = var.r2_access_key_id
+      R2_SECRET_ACCESS_KEY = var.r2_secret_access_key
     }
   }
 }
