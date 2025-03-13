@@ -36,10 +36,7 @@ jobs:
       - name: zip python code
         run: |
           zip -r ./python_lambda.zip handler.py r2.py python/* ipam.ttf invoice_generator.py
-          ls -la
-          ls ..
-          ls ../terraform
-          ls ../terraform/lambda
+          mkdir -p ../terraform/lambda
           mv ./python_lambda.zip ../terraform/lambda/python_lambda.zip
         working-directory: pdf_generate/src
 
