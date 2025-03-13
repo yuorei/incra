@@ -8,6 +8,7 @@ on:
 permissions:
   id-token: write 
   contents: read
+  issues: write
 
 jobs:
   terraform-plan:
@@ -58,7 +59,7 @@ jobs:
         run: terraform validate -no-color
 
       # Terraform Planの実行
-      - name: Apply Terraform
+      - name: Plan Terraform
         env:
           FONT_NAME: ${{ secrets.FONT_NAME }}
           FONT_PATH: ${{ secrets.FONT_PATH }}
