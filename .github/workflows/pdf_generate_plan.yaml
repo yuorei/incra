@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - pdf_generate/terraform/**
+
+permissions:
+  id-token: write 
+  contents: read
 jobs:
   terraform-plan:
     runs-on: ubuntu-latest
@@ -36,6 +40,13 @@ jobs:
 
       - name: Check files
         run: ls -la pdf_generate/terraform
+
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions
+          aws-region: ap-northeast-1
 
       # Terraform Initの実行
       - name: Terraform Init
