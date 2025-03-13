@@ -33,6 +33,12 @@ jobs:
         with:
           ref: ${{ steps.upstreambranch.outputs.branchname }}
 
+      - name: zip python code
+        run: |
+          zip -r ./python_lambda.zip handler.py r2.py python/* ipam.ttf invoice_generator.py
+          mv ./python_lambda.zip ../terraform/lambda/python_lambda.zip
+        working-directory: pdf_generate/src
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
