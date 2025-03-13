@@ -4,6 +4,11 @@ on:
   pull_request:
     paths:
       - pdf_generate/terraform/**
+
+permissions:
+  id-token: write 
+  contents: read
+
 jobs:
   terraform-plan:
     runs-on: ubuntu-latest
