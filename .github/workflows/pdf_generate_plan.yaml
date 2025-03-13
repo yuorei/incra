@@ -48,27 +48,27 @@ jobs:
         run: terraform validate -no-color
 
       # Terraform Planの実行
-      - name: Run terraform plan
-        # env:
-        #   FONT_NAME: ${{ secrets.FONT_NAME }}
-        #   FONT_PATH: ${{ secrets.FONT_PATH }}
-        #   R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
-        #   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        #   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        #   REGION_NAME: ${{ secrets.REGION_NAME }}
-        #   BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
-        id: plan
+      - name: Plan Terraform
+        env:
+          FONT_NAME: ${{ secrets.FONT_NAME }}
+          FONT_PATH: ${{ secrets.FONT_PATH }}
+          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_REGION_NAME: ${{ secrets.R2_REGION_NAME }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         run: |
-          terraform plan -no-color \
-            -var "font_name=test" \
-            -var "font_path=test" \
-            -var "r2_endpoint_url=test" \
-            -var "aws_access_key_id=test" \
-            -var "aws_secret_access_key=test" \
-            -var "region_name=test" \
-            -var "bucket_name=test"
+          terraform plan \
+            -var "font_name=${FONT_NAME}" \
+            -var "font_path=${FONT_PATH}" \
+            -var "r2_endpoint_url=${R2_ENDPOINT_URL}" \
+            -var "r2_access_key_id=${R2_ACCESS_KEY_ID}" \
+            -var "r2_secret_access_key=${R2_SECRET_ACCESS_KEY}" \
+            -var "region_name=${R2_REGION_NAME}" \
+            -var "bucket_name=${BUCKET_NAME}" \
+            -var "aws_account_id=${AWS_ACCOUNT_ID}"
         working-directory: pdf_generate/terraform
-
       # Planの結果を整形してハイライト可能なdiff形式に変換
       - name: Reformat Plan
         run: |
