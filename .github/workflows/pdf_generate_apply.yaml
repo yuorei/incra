@@ -64,9 +64,6 @@ jobs:
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         run: |
-          # 一旦確認したい
-          ls -la
-          ls ./lambda/
           terraform apply -auto-approve \
             -var "font_name=${FONT_NAME}" \
             -var "font_path=${FONT_PATH}" \
@@ -77,17 +74,3 @@ jobs:
             -var "bucket_name=${BUCKET_NAME}" \
             -var "aws_account_id=${AWS_ACCOUNT_ID}"
         working-directory: pdf_generate/terraform
-
-      - name: Comment on PR
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const prNumber = context.issue.number;
-            const comment = `Terraform Apply has been executed successfully. ✅`;
-            github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body: comment
-            });
