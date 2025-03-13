@@ -1,10 +1,5 @@
 provider "aws" {
   region = "ap-northeast-1"
-
-  # assume_role {
-  #   role_arn     = "arn:aws:iam::${var.aws_account_id}:role/github-actions"
-  #   session_name = "GitHubActionsTerraform"
-  # }
 }
 
 variable "aws_account_id" {
@@ -105,13 +100,13 @@ resource "aws_lambda_function" "python_lambda" {
 
   environment {
     variables = {
-      ENV             = "production"
-      FONT_NAME       = var.font_name
-      FONT_PATH       = var.font_path
-      R2_ENDPOINT_URL = var.r2_endpoint_url
-      REGION_NAME     = var.region_name
-      BUCKET_NAME     = var.bucket_name
-      R2_ACCESS_KEY_ID    = var.r2_access_key_id
+      ENV                  = "production"
+      FONT_NAME            = var.font_name
+      FONT_PATH            = var.font_path
+      R2_ENDPOINT_URL      = var.r2_endpoint_url
+      REGION_NAME          = var.region_name
+      BUCKET_NAME          = var.bucket_name
+      R2_ACCESS_KEY_ID     = var.r2_access_key_id
       R2_SECRET_ACCESS_KEY = var.r2_secret_access_key
     }
   }

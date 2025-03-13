@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - pdf_generate/terraform/**
+
+permissions:
+  id-token: write 
+  contents: read
 jobs:
   terraform-plan:
     runs-on: ubuntu-latest
@@ -11,8 +15,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.upstreambranch.outputs.branchname }}
 
       # Python のセットアップと依存関係のインストール
       - name: Setup Python and Install Dependencies
@@ -32,15 +34,19 @@ jobs:
         run: |
           zip -r pdf_generate/terraform/lambda/python_lambda.zip pdf_generate/src
 
+      # Terraformのセットアップ
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Check files
+        run: ls -la pdf_generate/terraform
+
+      
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions
           aws-region: ap-northeast-1
-
-      # Terraformのセットアップ
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
 
       # Terraform Initの実行
       - name: Terraform Init
@@ -53,7 +59,7 @@ jobs:
         run: terraform validate -no-color
 
       # Terraform Planの実行
-      - name: Apply Terraform
+      - name: Plan Terraform
         env:
           FONT_NAME: ${{ secrets.FONT_NAME }}
           FONT_PATH: ${{ secrets.FONT_PATH }}
@@ -74,7 +80,6 @@ jobs:
             -var "bucket_name=${BUCKET_NAME}" \
             -var "aws_account_id=${AWS_ACCOUNT_ID}"
         working-directory: pdf_generate/terraform
-
       # Planの結果を整形してハイライト可能なdiff形式に変換
       - name: Reformat Plan
         run: |
