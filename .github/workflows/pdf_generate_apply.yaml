@@ -63,6 +63,9 @@ jobs:
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         run: |
+          # 一旦確認したい
+          ls -la
+          ls ./lambda/
           terraform apply -auto-approve \
             -var "font_name=${FONT_NAME}" \
             -var "font_path=${FONT_PATH}" \
