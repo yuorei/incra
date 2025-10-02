@@ -1,0 +1,120 @@
+name: "Incra API Server Plan"
+
+on:
+  pull_request:
+    paths:
+      - pdf_generate/terraform/**
+jobs:
+  terraform-plan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+          
+      # Terraformのセットアップ
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      # Terraform Initの実行
+      - name: Terraform Init
+        run: terraform init
+
+      # Terraform Validateの実行
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      # Terraform Planの実行
+      - name: Run terraform plan
+        env:
+          FONT_NAME: ${{ secrets.FONT_NAME }}
+          FONT_PATH: ${{ secrets.FONT_PATH }}
+          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }} 
+          REGION_NAME: ${{ secrets.REGION_NAME }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+        id: plan
+        run: terraform plan -no-color \
+          -var "font_name=${FONT_NAME}" \
+          -var "font_path=${FONT_PATH}" \
+          -var "r2_endpoint_url=${R2_ENDPOINT_URL}" \
+          -var "r2_access_key_id=${AWS_ACCESS_KEY_ID}" \
+          -var "_secret_access_key=${AWS_SECRET_ACCESS_KEY}" \
+          -var "region_aws=${AWS_REGION}" \
+          -var "region_name=${REGION_NAME}" \
+          -var "bucket_name=${BUCKET_NAME}"
+
+      # Planの結果を整形してハイライト可能なdiff形式に変換
+      - name: Reformat Plan
+        run: |
+          echo '${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}' \
+          | sed -E 's/^([[:space:]]+)([-+])/\2\1/g' > plan.txt
+
+      # Planの内容を環境変数に入れる
+      - name: Put Plan in Env Var
+        run: |
+          PLAN=$(cat plan.txt)
+          echo "PLAN<<EOF" >> $GITHUB_ENV
+          echo "$PLAN" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          
+      # PRコメントにPlanの結果を投稿
+      - name: Read Plan and Post Comment
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // 1. Retrieve existing bot comments for the PR
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            })
+            const botComment = comments.find(comment => {
+              return comment.user.type === 'Bot' && comment.body.includes('Terraform Format and Style')
+            })
+
+            // 2. Prepare format of the comment
+            const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+            <details><summary>Validation Output</summary>
+
+            \`\`\`terraform
+            ${{ steps.validate.outputs.stdout }}
+            \`\`\`
+
+            </details>
+
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`diff
+            ${{ env.PLAN }}
+            \`\`\`
+
+            </details>
+
+            *Pusher: @${{ github.actor }}, Working Directory: \`${{ matrix.directory }}\``;
+
+            // 3. If we have a comment, update it, otherwise create a new one
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: output
+              })
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: output
+              })
+            }
