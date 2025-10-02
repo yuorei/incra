@@ -6,8 +6,10 @@ on:
       - pdf_generate/terraform/**
 
 permissions:
-  id-token: write 
+  id-token: write
   contents: read
+  pull-requests: write
+  issues: write
 jobs:
   terraform-plan:
     runs-on: ubuntu-latest
@@ -48,8 +50,15 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions
           aws-region: ap-northeast-1
 
+      # Terraform Formatの確認
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -check -recursive
+        working-directory: pdf_generate/terraform
+
       # Terraform Initの実行
       - name: Terraform Init
+        id: init
         run: terraform init
         working-directory: pdf_generate/terraform
 
@@ -57,9 +66,11 @@ jobs:
       - name: Terraform Validate
         id: validate
         run: terraform validate -no-color
+        working-directory: pdf_generate/terraform
 
       # Terraform Planの実行
       - name: Plan Terraform
+        id: plan
         env:
           FONT_NAME: ${{ secrets.FONT_NAME }}
           FONT_PATH: ${{ secrets.FONT_PATH }}
@@ -70,7 +81,8 @@ jobs:
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         run: |
-          terraform plan \
+          : > plan_raw.txt
+          terraform plan -no-color \
             -var "font_name=${FONT_NAME}" \
             -var "font_path=${FONT_PATH}" \
             -var "r2_endpoint_url=${R2_ENDPOINT_URL}" \
@@ -78,16 +90,20 @@ jobs:
             -var "r2_secret_access_key=${R2_SECRET_ACCESS_KEY}" \
             -var "region_name=${R2_REGION_NAME}" \
             -var "bucket_name=${BUCKET_NAME}" \
-            -var "aws_account_id=${AWS_ACCOUNT_ID}"
+            -var "aws_account_id=${AWS_ACCOUNT_ID}" \
+            | tee -a plan_raw.txt
         working-directory: pdf_generate/terraform
       # Planの結果を整形してハイライト可能なdiff形式に変換
       - name: Reformat Plan
+        if: success() || failure()
+        working-directory: pdf_generate/terraform
         run: |
-          echo '${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}' \
-          | sed -E 's/^([[:space:]]+)([-+])/\2\1/g' > plan.txt
+          sed -E 's/^([[:space:]]+)([-+])/\2\1/g' plan_raw.txt > plan.txt
 
       # Planの内容を環境変数に入れる
       - name: Put Plan in Env Var
+        if: success() || failure()
+        working-directory: pdf_generate/terraform
         run: |
           PLAN=$(cat plan.txt)
           echo "PLAN<<EOF" >> $GITHUB_ENV
@@ -108,11 +124,11 @@ jobs:
               issue_number: context.issue.number,
             })
             const botComment = comments.find(comment => {
-              return comment.user.type === 'Bot' && comment.body.includes('Terraform Format and Style')
+              return comment.user.type === 'Bot' && comment.body.includes('Terraform Format')
             })
 
             // 2. Prepare format of the comment
-            const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            const output = `#### Terraform Format 🖌\`${{ steps.fmt.outcome }}\`
             #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
             #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
             <details><summary>Validation Output</summary>
@@ -133,7 +149,7 @@ jobs:
 
             </details>
 
-            *Pusher: @${{ github.actor }}, Working Directory: \`${{ matrix.directory }}\``;
+            *Pusher: @${{ github.actor }}, Working Directory: \`pdf_generate/terraform\``;
 
             // 3. If we have a comment, update it, otherwise create a new one
             if (botComment) {
