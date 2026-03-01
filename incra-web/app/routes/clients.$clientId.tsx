@@ -3,8 +3,7 @@ import { useState } from "react";
 import type { Route } from "./+types/clients.$clientId";
 import { getSession } from "../lib/session";
 import { apiFetch } from "../lib/api";
-
-type SlackUser = { id: string; name: string; real_name: string };
+import { SlackUserSelect, type SlackUser } from "../components/slack-user-select";
 
 type Client = {
   client_id: string;
@@ -93,7 +92,11 @@ export default function ClientDetail({ loaderData, actionData }: Route.Component
   const { client, slackUsers } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
-  const [slackRealName, setSlackRealName] = useState(client.slack_real_name || "");
+
+  const defaultUser = client.slack_user_id
+    ? slackUsers.find((u) => u.id === client.slack_user_id) ?? null
+    : null;
+  const [selectedUser, setSelectedUser] = useState<SlackUser | null>(defaultUser);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -137,27 +140,16 @@ export default function ClientDetail({ loaderData, actionData }: Route.Component
             />
           </div>
           <div>
-            <label htmlFor="slack_user_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Slack User
             </label>
-            <select
-              id="slack_user_id"
-              name="slack_user_id"
-              defaultValue={client.slack_user_id || ""}
-              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              onChange={(e) => {
-                const user = slackUsers.find((u) => u.id === e.target.value);
-                setSlackRealName(user ? user.real_name : "");
-              }}
-            >
-              <option value="">選択してください</option>
-              {slackUsers.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.real_name} ({u.name})
-                </option>
-              ))}
-            </select>
-            <input type="hidden" name="slack_real_name" value={slackRealName} />
+            <SlackUserSelect
+              users={slackUsers}
+              defaultUserId={client.slack_user_id}
+              onSelect={setSelectedUser}
+            />
+            <input type="hidden" name="slack_user_id" value={selectedUser?.id ?? ""} />
+            <input type="hidden" name="slack_real_name" value={selectedUser?.real_name ?? ""} />
           </div>
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

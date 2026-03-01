@@ -590,9 +590,11 @@ func (s *ServerImpl) SlackInteractionHandler(c echo.Context) error {
 }
 
 type SlackUser struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	RealName string `json:"real_name"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	RealName     string `json:"real_name"`
+	DisplayName  string `json:"display_name"`
+	ProfileImage string `json:"profile_image"`
 }
 
 func (s *ServerImpl) SlackUsersHandler(c echo.Context) error {
@@ -610,9 +612,11 @@ func (s *ServerImpl) SlackUsersHandler(c echo.Context) error {
 			continue
 		}
 		result = append(result, SlackUser{
-			ID:       u.ID,
-			Name:     u.Name,
-			RealName: u.RealName,
+			ID:           u.ID,
+			Name:         u.Name,
+			RealName:     u.RealName,
+			DisplayName:  u.Profile.DisplayName,
+			ProfileImage: u.Profile.Image48,
 		})
 	}
 
