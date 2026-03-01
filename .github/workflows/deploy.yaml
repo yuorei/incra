@@ -9,6 +9,7 @@ on:
       - incra_api_server/**
       - pdf_generate/**
       - infra/**
+      - .github/workflows/deploy.yaml
 
 permissions:
   id-token: write
