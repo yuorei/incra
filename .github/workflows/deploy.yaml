@@ -28,6 +28,12 @@ jobs:
         with:
           go-version-file: incra_api_server/go.mod
 
+      - name: Generate OpenAPI code
+        working-directory: incra_api_server
+        run: |
+          go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+          make gen
+
       - name: Build API Server Lambda
         working-directory: incra_api_server
         run: |
