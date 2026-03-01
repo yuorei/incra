@@ -1,4 +1,4 @@
-import { redirect, Form } from "react-router";
+import { redirect, Form, Link } from "react-router";
 import type { Route } from "./+types/home";
 import { getSession, clearSessionCookie } from "../lib/session";
 
@@ -63,7 +63,17 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </div>
       </header>
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <p className="text-gray-600">ようこそ、{user.name} さん！</p>
+        <p className="text-gray-600 mb-6">ようこそ、{user.name} さん！</p>
+        <div className="grid grid-cols-2 gap-4">
+          <Link to="/invoices" className="block bg-white shadow rounded-lg p-6 hover:shadow-md transition">
+            <h2 className="text-lg font-semibold text-gray-700">請求書管理</h2>
+            <p className="text-sm text-gray-500 mt-1">請求書の作成・管理</p>
+          </Link>
+          <Link to="/clients" className="block bg-white shadow rounded-lg p-6 hover:shadow-md transition">
+            <h2 className="text-lg font-semibold text-gray-700">取引先管理</h2>
+            <p className="text-sm text-gray-500 mt-1">取引先の登録・管理</p>
+          </Link>
+        </div>
       </main>
     </div>
   );
