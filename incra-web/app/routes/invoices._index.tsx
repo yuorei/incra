@@ -22,10 +22,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  sent: "bg-blue-100 text-blue-700",
-  paid: "bg-green-100 text-green-700",
-  cancelled: "bg-red-100 text-red-700",
+  draft: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300",
+  sent: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  paid: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+  cancelled: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
 };
 
 function formatYen(amount: number): string {
@@ -64,13 +64,13 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <nav className="flex gap-4 items-center">
-            <Link to="/" className="text-xl font-bold text-gray-800">incra</Link>
-            <Link to="/invoices" className="text-sm text-blue-600 hover:underline font-semibold">請求書</Link>
-            <Link to="/clients" className="text-sm text-blue-600 hover:underline">取引先</Link>
+            <Link to="/" className="text-xl font-bold text-gray-800 dark:text-white">incra</Link>
+            <Link to="/invoices" className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-semibold">請求書</Link>
+            <Link to="/clients" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">取引先</Link>
           </nav>
           <Link to="/invoices/new" className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
             新規作成
@@ -78,7 +78,7 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
         </div>
       </header>
       <main className="max-w-6xl mx-auto px-4 py-8">
-        <h2 className="text-lg font-semibold text-gray-700 mb-4">請求書一覧</h2>
+        <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">請求書一覧</h2>
         <div className="flex gap-2 mb-6">
           {tabs.map((tab) => (
             <Link
@@ -87,7 +87,7 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
               className={`px-3 py-1.5 rounded text-sm ${
                 currentStatus === tab.value
                   ? "bg-blue-600 text-white"
-                  : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                  : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
               }`}
             >
               {tab.label}
@@ -95,34 +95,34 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
           ))}
         </div>
         {invoices.length === 0 ? (
-          <p className="text-gray-500">請求書がありません。</p>
+          <p className="text-gray-500 dark:text-gray-400">請求書がありません。</p>
         ) : (
-          <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700">
                 <tr>
-                  <th className="px-4 py-3 text-left text-gray-600">請求書ID</th>
-                  <th className="px-4 py-3 text-left text-gray-600">取引先</th>
-                  <th className="px-4 py-3 text-right text-gray-600">合計金額</th>
-                  <th className="px-4 py-3 text-left text-gray-600">期限</th>
-                  <th className="px-4 py-3 text-left text-gray-600">ステータス</th>
-                  <th className="px-4 py-3 text-left text-gray-600">操作</th>
+                  <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">請求書ID</th>
+                  <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">取引先</th>
+                  <th className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">合計金額</th>
+                  <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">期限</th>
+                  <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">ステータス</th>
+                  <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {invoices.map((inv) => (
-                  <tr key={inv.invoice_id} className="border-b hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-900 font-mono text-xs">{inv.invoice_id.slice(0, 8)}</td>
-                    <td className="px-4 py-3 text-gray-900">{inv.billing_client_name || inv.billing_client_id}</td>
-                    <td className="px-4 py-3 text-right text-gray-900 font-medium">{formatYen(inv.total_amount)}</td>
-                    <td className="px-4 py-3 text-gray-600">{inv.due_date}</td>
+                  <tr key={inv.invoice_id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-4 py-3 text-gray-900 dark:text-gray-100 font-mono text-xs">{inv.invoice_id.slice(0, 8)}</td>
+                    <td className="px-4 py-3 text-gray-900 dark:text-gray-100">{inv.billing_client_name || inv.billing_client_id}</td>
+                    <td className="px-4 py-3 text-right text-gray-900 dark:text-gray-100 font-medium">{formatYen(inv.total_amount)}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{inv.due_date}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[inv.status] || "bg-gray-100 text-gray-700"}`}>
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[inv.status] || "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"}`}>
                         {STATUS_LABELS[inv.status] || inv.status}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <Link to={`/invoices/${inv.invoice_id}`} className="text-blue-600 hover:underline">
+                      <Link to={`/invoices/${inv.invoice_id}`} className="text-blue-600 dark:text-blue-400 hover:underline">
                         詳細
                       </Link>
                     </td>

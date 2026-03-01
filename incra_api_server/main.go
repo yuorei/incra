@@ -35,6 +35,7 @@ func init() {
 	e.POST("/slack/events", server.SlackEventsHandler)
 	e.POST("/slack/slashs", server.SlackSlashsHandler)
 	e.POST("/slack/interactions", server.SlackInteractionHandler)
+	e.GET("/slack/users", server.SlackUsersHandler)
 
 	petstore.RegisterHandlers(e, server)
 

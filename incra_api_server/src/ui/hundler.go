@@ -15,6 +15,7 @@ import (
 	"github.com/slack-go/slack/slackevents"
 	petstore "github.com/yuorei/incra_api_server/api/v1"
 	"github.com/yuorei/incra_api_server/src/domain"
+	"github.com/yuorei/incra_api_server/src/infrastructure"
 	"github.com/yuorei/incra_api_server/src/usecase"
 )
 
@@ -353,17 +354,32 @@ func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
 		)
 	}
 
-	clientSelect := slack.NewSectionBlock(
-		slack.NewTextBlockObject(slack.MarkdownType, "*取引先*", false, false),
-		nil,
-		slack.NewAccessory(slack.NewOptionsSelectBlockElement(
-			slack.OptTypeStatic,
-			slack.NewTextBlockObject(slack.PlainTextType, "取引先を選択", false, false),
-			"client_select",
-			clientOptions...,
-		)),
+	clientSelectElement := slack.NewOptionsSelectBlockElement(
+		slack.OptTypeStatic,
+		slack.NewTextBlockObject(slack.PlainTextType, "取引先を選択", false, false),
+		"client_select",
+		clientOptions...,
 	)
-	clientSelect.BlockID = "client_block"
+	clientSelect := slack.NewInputBlock(
+		"client_block",
+		slack.NewTextBlockObject(slack.PlainTextType, "取引先", false, false),
+		nil,
+		clientSelectElement,
+	)
+	clientSelect.Optional = true
+
+	billingUserElement := &slack.SelectBlockElement{
+		Type:        "users_select",
+		Placeholder: slack.NewTextBlockObject(slack.PlainTextType, "担当者を選択", false, false),
+		ActionID:    "billing_user_action",
+	}
+	billingUserSelect := slack.NewInputBlock(
+		"billing_user_block",
+		slack.NewTextBlockObject(slack.PlainTextType, "請求先担当者", false, false),
+		nil,
+		billingUserElement,
+	)
+	billingUserSelect.Optional = true
 
 	dueDatePicker := slack.NewInputBlock(
 		"due_date_block",
@@ -424,13 +440,14 @@ func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
 	additionalInfoInput.Optional = true
 
 	modalView := slack.ModalViewRequest{
-		Type:  slack.VTModal,
-		Title: slack.NewTextBlockObject(slack.PlainTextType, "請求書作成", false, false),
+		Type:   slack.VTModal,
+		Title:  slack.NewTextBlockObject(slack.PlainTextType, "請求書作成", false, false),
 		Submit: slack.NewTextBlockObject(slack.PlainTextType, "作成", false, false),
 		Close:  slack.NewTextBlockObject(slack.PlainTextType, "キャンセル", false, false),
 		Blocks: slack.Blocks{
 			BlockSet: []slack.Block{
 				clientSelect,
+				billingUserSelect,
 				dueDatePicker,
 				bankDetailsInput,
 				itemDescInput,
@@ -471,10 +488,16 @@ func (s *ServerImpl) SlackInteractionHandler(c echo.Context) error {
 
 	values := interaction.View.State.Values
 
-	// 取引先
+	// 取引先（任意）
+	var billingClientId, billingClientName string
 	clientOption := values["client_block"]["client_select"].SelectedOption
-	billingClientId := clientOption.Value
-	billingClientName := clientOption.Text.Text
+	if clientOption.Value != "" {
+		billingClientId = clientOption.Value
+		billingClientName = clientOption.Text.Text
+	}
+
+	// 請求先担当者（任意）
+	billingUser := values["billing_user_block"]["billing_user_action"].SelectedUser
 
 	// 支払期限
 	dueDate := values["due_date_block"]["due_date_action"].SelectedDate
@@ -537,8 +560,26 @@ func (s *ServerImpl) SlackInteractionHandler(c echo.Context) error {
 		return c.String(http.StatusOK, "")
 	}
 
-	message := fmt.Sprintf("請求書を作成しました\n• 請求書ID: %s\n• 取引先: %s\n• 合計金額: ¥%s\n• 支払期限: %s",
-		created.InvoiceId, created.BillingClientName, formatAmount(created.TotalAmount), created.DueDate)
+	// ステータスをsentに遷移
+	sent, err := s.invoiceUseCase.TransitionStatus(created.InvoiceId, domain.InvoiceStatusSent, issuerSlackRealName)
+	if err != nil {
+		fmt.Printf("warning: failed to transition invoice to sent: %v\n", err)
+		sent = created
+	}
+
+	// 請求先担当者にDM通知
+	if billingUser != "" {
+		if err := infrastructure.SendInvoiceNotificationDM(billingUser, sent); err != nil {
+			fmt.Printf("warning: failed to send billing user notification DM: %v\n", err)
+		}
+	}
+
+	clientDisplay := sent.BillingClientName
+	if clientDisplay == "" {
+		clientDisplay = "未指定"
+	}
+	message := fmt.Sprintf("請求書を作成・送付しました\n• 請求書ID: %s\n• 取引先: %s\n• 合計金額: ¥%s\n• 支払期限: %s",
+		sent.InvoiceId, clientDisplay, formatAmount(sent.TotalAmount), sent.DueDate)
 
 	_, _, err = api.PostMessage(issuerSlackUserId, slack.MsgOptionText(message, false))
 	if err != nil {
@@ -546,6 +587,36 @@ func (s *ServerImpl) SlackInteractionHandler(c echo.Context) error {
 	}
 
 	return c.String(http.StatusOK, "")
+}
+
+type SlackUser struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	RealName string `json:"real_name"`
+}
+
+func (s *ServerImpl) SlackUsersHandler(c echo.Context) error {
+	slackToken := os.Getenv("SLACK_TOKEN")
+	api := slack.New(slackToken)
+
+	users, err := api.GetUsers()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get users"})
+	}
+
+	var result []SlackUser
+	for _, u := range users {
+		if u.IsBot || u.Deleted {
+			continue
+		}
+		result = append(result, SlackUser{
+			ID:       u.ID,
+			Name:     u.Name,
+			RealName: u.RealName,
+		})
+	}
+
+	return c.JSON(http.StatusOK, result)
 }
 
 func domainInvoiceToAPI(inv domain.Invoice) petstore.Invoice {

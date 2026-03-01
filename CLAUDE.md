@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
      - `src/domain/` - ビジネスロジック（Invoice, Client）とリポジトリインターフェース
      - `src/usecase/` - ユースケース層（InvoiceUseCase, ClientUseCase）
      - `src/ui/` - HTTPハンドラー（Echo framework）、Slackハンドラー、認証ミドルウェア
-     - `src/infrastructure/` - 外部サービス統合（DynamoDB, SQS, Slack）
+     - `src/infrastructure/` - 外部サービス統合（DynamoDB, SQS, Slack DM通知）
    - `api/v1/generated.go` - OpenAPI仕様（`petstore.yaml`）から自動生成
    - AWS Lambda上でEcho serverを実行（aws-lambda-go-api-proxy使用）
    - DynamoDB: `incra-invoices`, `incra-clients`, `incra-counter` テーブル使用
@@ -58,7 +58,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `PATCH /invoices/{invoice_id}/status` - ステータス遷移
 - `DELETE /invoices/{invoice_id}` - 削除（draftのみ）
 
-ステータス遷移: draft→sent（PDF生成SQS送信）、sent→paid/cancelled、draft→cancelled
+ステータス遷移: draft→sent（PDF生成SQS送信 + 取引先Slack DM通知）、sent→paid/cancelled、draft→cancelled
 
 ### 取引先（Clients）
 - `POST /clients` - 取引先登録
@@ -69,7 +69,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Slack
 - `POST /slack/events` - Slackイベント受信
-- `POST /slack/slashs` - Slackスラッシュコマンド
+- `POST /slack/slashs` - Slackスラッシュコマンド（請求書作成モーダル → 即sent遷移）
+- `POST /slack/interactions` - Slackモーダル送信処理
+- `GET /slack/users` - Slackワークスペースユーザー一覧取得
 
 ## Development Commands
 

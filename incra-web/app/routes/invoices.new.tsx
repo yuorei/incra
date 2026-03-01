@@ -99,28 +99,28 @@ export default function InvoicesNew({ loaderData, actionData }: Route.ComponentP
   const total = items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <nav className="flex gap-4 items-center">
-            <Link to="/" className="text-xl font-bold text-gray-800">incra</Link>
-            <Link to="/invoices" className="text-sm text-blue-600 hover:underline font-semibold">請求書</Link>
-            <Link to="/clients" className="text-sm text-blue-600 hover:underline">取引先</Link>
+            <Link to="/" className="text-xl font-bold text-gray-800 dark:text-white">incra</Link>
+            <Link to="/invoices" className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-semibold">請求書</Link>
+            <Link to="/clients" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">取引先</Link>
           </nav>
         </div>
       </header>
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <h2 className="text-lg font-semibold text-gray-700 mb-6">請求書新規作成</h2>
+        <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-6">請求書新規作成</h2>
         {actionData?.error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded mb-4">
             {actionData.error}
           </div>
         )}
-        <Form method="post" className="bg-white shadow rounded-lg p-6 space-y-6">
+        <Form method="post" className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 space-y-6">
           <input type="hidden" name="item_count" value={items.length} />
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="billing_client_id" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="billing_client_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 取引先 <span className="text-red-500">*</span>
               </label>
               <input type="hidden" name="billing_client_name" id="billing_client_name" />
@@ -128,7 +128,7 @@ export default function InvoicesNew({ loaderData, actionData }: Route.ComponentP
                 id="billing_client_id"
                 name="billing_client_id"
                 required
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 onChange={(e) => {
                   const nameInput = document.getElementById("billing_client_name") as HTMLInputElement;
                   nameInput.value = e.target.selectedOptions[0]?.text || "";
@@ -143,7 +143,7 @@ export default function InvoicesNew({ loaderData, actionData }: Route.ComponentP
               </select>
             </div>
             <div>
-              <label htmlFor="due_date" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="due_date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 支払期限 <span className="text-red-500">*</span>
               </label>
               <input
@@ -151,54 +151,54 @@ export default function InvoicesNew({ loaderData, actionData }: Route.ComponentP
                 id="due_date"
                 name="due_date"
                 required
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
           <div>
-            <label htmlFor="bank_details" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="bank_details" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               振込先情報
             </label>
             <input
               type="text"
               id="bank_details"
               name="bank_details"
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label htmlFor="additional_info" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="additional_info" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               備考
             </label>
             <textarea
               id="additional_info"
               name="additional_info"
               rows={2}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-700">品目</h3>
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">品目</h3>
               <button
                 type="button"
                 onClick={addItem}
-                className="text-sm text-blue-600 hover:text-blue-800"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
               >
                 + 行を追加
               </button>
             </div>
             <div className="space-y-3">
               {items.map((item, index) => (
-                <div key={item.key} className="border border-gray-200 rounded p-3 space-y-2">
+                <div key={item.key} className="border border-gray-200 dark:border-gray-600 rounded p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">品目 {index + 1}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">品目 {index + 1}</span>
                     {items.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeItem(item.key)}
-                        className="text-xs text-red-500 hover:text-red-700"
+                        className="text-xs text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
                       >
                         削除
                       </button>
@@ -206,28 +206,28 @@ export default function InvoicesNew({ loaderData, actionData }: Route.ComponentP
                   </div>
                   <div className="grid grid-cols-5 gap-2">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">日付</label>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">日付</label>
                       <input
                         type="date"
                         name={`items[${index}].date`}
                         value={item.date}
                         onChange={(e) => updateItem(item.key, "date", e.target.value)}
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-2 py-1 text-sm"
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-xs text-gray-500 mb-0.5">内容</label>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">内容</label>
                       <input
                         type="text"
                         name={`items[${index}].description`}
                         value={item.description}
                         onChange={(e) => updateItem(item.key, "description", e.target.value)}
                         required
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-2 py-1 text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">数量</label>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">数量</label>
                       <input
                         type="number"
                         name={`items[${index}].quantity`}
@@ -236,11 +236,11 @@ export default function InvoicesNew({ loaderData, actionData }: Route.ComponentP
                         min={0}
                         step="any"
                         required
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-2 py-1 text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">単価</label>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">単価</label>
                       <input
                         type="number"
                         name={`items[${index}].unit_price`}
@@ -249,29 +249,29 @@ export default function InvoicesNew({ loaderData, actionData }: Route.ComponentP
                         min={0}
                         step="any"
                         required
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-2 py-1 text-sm"
                       />
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex-1 mr-2">
-                      <label className="block text-xs text-gray-500 mb-0.5">メモ</label>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">メモ</label>
                       <input
                         type="text"
                         name={`items[${index}].memo`}
                         value={item.memo}
                         onChange={(e) => updateItem(item.key, "memo", e.target.value)}
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-2 py-1 text-sm"
                       />
                     </div>
-                    <div className="text-sm text-gray-700 font-medium pt-4">
+                    <div className="text-sm text-gray-700 dark:text-gray-300 font-medium pt-4">
                       {"\u00a5"}{(item.quantity * item.unit_price).toLocaleString()}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-4 text-right text-lg font-semibold text-gray-800">
+            <div className="mt-4 text-right text-lg font-semibold text-gray-800 dark:text-white">
               合計: {"\u00a5"}{total.toLocaleString()}
             </div>
           </div>
@@ -284,7 +284,7 @@ export default function InvoicesNew({ loaderData, actionData }: Route.ComponentP
             >
               {isSubmitting ? "作成中..." : "作成"}
             </button>
-            <Link to="/invoices" className="px-6 py-2 rounded text-sm text-gray-600 hover:text-gray-800 border border-gray-300">
+            <Link to="/invoices" className="px-6 py-2 rounded text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-300 dark:border-gray-600">
               キャンセル
             </Link>
           </div>

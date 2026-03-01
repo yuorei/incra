@@ -16,7 +16,9 @@ Go製のバックエンドAPIサーバー。AWS Lambda上で動作します。
   - 取引先マスタ管理
   - 請求書番号の自動採番（INV-YYYY-NNNN）
   - SQS経由のPDF生成トリガー
-  - Slackスラッシュコマンド対応
+  - sent遷移時の取引先Slack DM通知
+  - Slackスラッシュコマンド対応（即sent遷移、取引先任意）
+  - Slackワークスペースユーザー一覧API
 - **デプロイ**: AWS Lambda + API Gateway
 
 ### 2. Reminder Lambda (incra_api_server/cmd/reminder/)
@@ -95,7 +97,7 @@ npm run dev
 | GET | /invoices | 一覧取得（?status=&limit=&last_key=） |
 | GET | /invoices/{id} | 詳細取得 |
 | PUT | /invoices/{id} | 更新（draftのみ） |
-| PATCH | /invoices/{id}/status | ステータス遷移 |
+| PATCH | /invoices/{id}/status | ステータス遷移（sent時に取引先DM通知） |
 | DELETE | /invoices/{id} | 削除（draftのみ） |
 
 ### 取引先
@@ -107,15 +109,31 @@ npm run dev
 | PUT | /clients/{id} | 更新 |
 | DELETE | /clients/{id} | 削除 |
 
+### Slack
+| メソッド | パス | 説明 |
+|---------|------|------|
+| GET | /slack/users | ワークスペースユーザー一覧 |
+| POST | /slack/events | Slackイベント受信 |
+| POST | /slack/slashs | スラッシュコマンド（請求書作成モーダル） |
+| POST | /slack/interactions | モーダル送信処理 |
+
 ## E2Eフロー
 
-1. 取引先登録（Web UI or API）
+1. 取引先登録（Web UI or API）- Slackユーザードロップダウンから選択可能
 2. 請求書作成（draft状態）
-3. draft → sent ステータス遷移（PDF生成SQS送信）
+3. draft → sent ステータス遷移（PDF生成SQS送信 + 取引先Slack DM通知）
 4. PDF生成Lambda実行 → R2アップロード → DynamoDB pdf_url更新
 5. sent → paid ステータス遷移
 6. Web UIで一覧・詳細・PDF確認
 7. リマインダーLambdaが期限間近の請求書をSlack通知
+
+### Slackフロー（スラッシュコマンド）
+
+1. `/invoice-gen` → モーダル表示（取引先:任意、請求先担当者:任意）
+2. 送信 → 請求書作成（draft） → 即sent遷移
+3. PDF生成（SQS送信）
+4. 発行者にDM: 「請求書を作成・送付しました」
+5. 請求先担当者にDM: 「請求書が届きました」（選択されていれば）
 
 ## デプロイ
 

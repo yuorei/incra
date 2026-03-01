@@ -10,9 +10,10 @@
    - `src/domain/` - ドメインモデル（Invoice, Client）とリポジトリインターフェース
    - `src/usecase/` - ユースケース層（InvoiceUseCase, ClientUseCase）
    - `src/ui/` - HTTPハンドラー（Echo framework）、Slackハンドラー、認証ミドルウェア
-   - `src/infrastructure/` - DynamoDB, SQS実装
+   - `src/infrastructure/` - DynamoDB, SQS, Slack DM通知実装
    - `api/v1/generated.go` - `petstore.yaml`から自動生成（直接編集禁止）
    - `cmd/reminder/` - リマインダーLambda（毎日Slack通知）
+   - Slack連携: ユーザー一覧API（`GET /slack/users`）、sent時DM通知、モーダルで即sent遷移
 
 2. **pdf_generate/** - Python PDF生成Lambda
    - SQSからインボイスデータ受信 → PDF生成 → R2アップロード → DynamoDB更新

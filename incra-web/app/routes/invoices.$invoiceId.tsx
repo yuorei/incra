@@ -42,10 +42,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  sent: "bg-blue-100 text-blue-700",
-  paid: "bg-green-100 text-green-700",
-  cancelled: "bg-red-100 text-red-700",
+  draft: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300",
+  sent: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  paid: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+  cancelled: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
 };
 
 function formatYen(amount: number): string {
@@ -95,74 +95,74 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
   const isSubmitting = navigation.state === "submitting";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <nav className="flex gap-4 items-center">
-            <Link to="/" className="text-xl font-bold text-gray-800">incra</Link>
-            <Link to="/invoices" className="text-sm text-blue-600 hover:underline font-semibold">請求書</Link>
-            <Link to="/clients" className="text-sm text-blue-600 hover:underline">取引先</Link>
+            <Link to="/" className="text-xl font-bold text-gray-800 dark:text-white">incra</Link>
+            <Link to="/invoices" className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-semibold">請求書</Link>
+            <Link to="/clients" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">取引先</Link>
           </nav>
         </div>
       </header>
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-700">請求書詳細</h2>
+          <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300">請求書詳細</h2>
           <div className="flex gap-3">
             {invoice.status === "draft" && (
               <Link
                 to={`/invoices/${invoice.invoice_id}/edit`}
-                className="text-sm text-blue-600 hover:underline"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
               >
                 編集
               </Link>
             )}
-            <Link to="/invoices" className="text-sm text-blue-600 hover:underline">一覧に戻る</Link>
+            <Link to="/invoices" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">一覧に戻る</Link>
           </div>
         </div>
         {actionData?.error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded mb-4">
             {actionData.error}
           </div>
         )}
 
-        <div className="bg-white shadow rounded-lg p-6 mb-6">
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <span className="text-xs text-gray-500">請求書ID</span>
-              <p className="text-sm font-mono text-gray-900">{invoice.invoice_id}</p>
+              <span className="text-xs text-gray-500 dark:text-gray-400">請求書ID</span>
+              <p className="text-sm font-mono text-gray-900 dark:text-gray-100">{invoice.invoice_id}</p>
             </div>
             <div>
-              <span className="text-xs text-gray-500">ステータス</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">ステータス</span>
               <p>
-                <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[invoice.status] || "bg-gray-100 text-gray-700"}`}>
+                <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[invoice.status] || "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"}`}>
                   {STATUS_LABELS[invoice.status] || invoice.status}
                 </span>
               </p>
             </div>
             <div>
-              <span className="text-xs text-gray-500">取引先</span>
-              <p className="text-sm text-gray-900">{invoice.billing_client_name || invoice.billing_client_id}</p>
+              <span className="text-xs text-gray-500 dark:text-gray-400">取引先</span>
+              <p className="text-sm text-gray-900 dark:text-gray-100">{invoice.billing_client_name || invoice.billing_client_id}</p>
             </div>
             <div>
-              <span className="text-xs text-gray-500">支払期限</span>
-              <p className="text-sm text-gray-900">{invoice.due_date}</p>
+              <span className="text-xs text-gray-500 dark:text-gray-400">支払期限</span>
+              <p className="text-sm text-gray-900 dark:text-gray-100">{invoice.due_date}</p>
             </div>
             <div>
-              <span className="text-xs text-gray-500">合計金額</span>
-              <p className="text-lg font-semibold text-gray-900">{formatYen(invoice.total_amount)}</p>
+              <span className="text-xs text-gray-500 dark:text-gray-400">合計金額</span>
+              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{formatYen(invoice.total_amount)}</p>
             </div>
             {invoice.bank_details && (
               <div>
-                <span className="text-xs text-gray-500">振込先</span>
-                <p className="text-sm text-gray-900">{invoice.bank_details}</p>
+                <span className="text-xs text-gray-500 dark:text-gray-400">振込先</span>
+                <p className="text-sm text-gray-900 dark:text-gray-100">{invoice.bank_details}</p>
               </div>
             )}
           </div>
           {invoice.additional_info && (
             <div className="mb-4">
-              <span className="text-xs text-gray-500">備考</span>
-              <p className="text-sm text-gray-900 whitespace-pre-wrap">{invoice.additional_info}</p>
+              <span className="text-xs text-gray-500 dark:text-gray-400">備考</span>
+              <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">{invoice.additional_info}</p>
             </div>
           )}
           {invoice.pdf_url && (
@@ -171,14 +171,14 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
                 href={invoice.pdf_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-blue-600 hover:underline"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
               >
                 PDFを表示
               </a>
             </div>
           )}
 
-          <div className="flex gap-2 pt-4 border-t">
+          <div className="flex gap-2 pt-4 border-t dark:border-gray-700">
             {invoice.status === "draft" && (
               <>
                 <Form method="post">
@@ -198,7 +198,7 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="border border-red-300 text-red-600 px-4 py-2 rounded text-sm hover:bg-red-50 disabled:opacity-50"
+                    className="border border-red-300 dark:border-red-600 text-red-600 dark:text-red-400 px-4 py-2 rounded text-sm hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-50"
                     onClick={(e) => {
                       if (!confirm("キャンセルしますか？")) e.preventDefault();
                     }}
@@ -227,7 +227,7 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="border border-red-300 text-red-600 px-4 py-2 rounded text-sm hover:bg-red-50 disabled:opacity-50"
+                    className="border border-red-300 dark:border-red-600 text-red-600 dark:text-red-400 px-4 py-2 rounded text-sm hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-50"
                     onClick={(e) => {
                       if (!confirm("キャンセルしますか？")) e.preventDefault();
                     }}
@@ -241,28 +241,28 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
         </div>
 
         {invoice.items && invoice.items.length > 0 && (
-          <div className="bg-white shadow rounded-lg p-6 mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">品目</h3>
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">品目</h3>
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700">
                 <tr>
-                  <th className="px-3 py-2 text-left text-gray-600">日付</th>
-                  <th className="px-3 py-2 text-left text-gray-600">内容</th>
-                  <th className="px-3 py-2 text-right text-gray-600">数量</th>
-                  <th className="px-3 py-2 text-right text-gray-600">単価</th>
-                  <th className="px-3 py-2 text-right text-gray-600">金額</th>
-                  <th className="px-3 py-2 text-left text-gray-600">メモ</th>
+                  <th className="px-3 py-2 text-left text-gray-600 dark:text-gray-400">日付</th>
+                  <th className="px-3 py-2 text-left text-gray-600 dark:text-gray-400">内容</th>
+                  <th className="px-3 py-2 text-right text-gray-600 dark:text-gray-400">数量</th>
+                  <th className="px-3 py-2 text-right text-gray-600 dark:text-gray-400">単価</th>
+                  <th className="px-3 py-2 text-right text-gray-600 dark:text-gray-400">金額</th>
+                  <th className="px-3 py-2 text-left text-gray-600 dark:text-gray-400">メモ</th>
                 </tr>
               </thead>
               <tbody>
                 {invoice.items.map((item, index) => (
-                  <tr key={index} className="border-b">
-                    <td className="px-3 py-2 text-gray-600">{item.date}</td>
-                    <td className="px-3 py-2 text-gray-900">{item.description}</td>
-                    <td className="px-3 py-2 text-right text-gray-600">{item.quantity}</td>
-                    <td className="px-3 py-2 text-right text-gray-600">{formatYen(item.unit_price)}</td>
-                    <td className="px-3 py-2 text-right font-medium text-gray-900">{formatYen(item.amount)}</td>
-                    <td className="px-3 py-2 text-gray-500">{item.memo || ""}</td>
+                  <tr key={index} className="border-b dark:border-gray-700">
+                    <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{item.date}</td>
+                    <td className="px-3 py-2 text-gray-900 dark:text-gray-100">{item.description}</td>
+                    <td className="px-3 py-2 text-right text-gray-600 dark:text-gray-400">{item.quantity}</td>
+                    <td className="px-3 py-2 text-right text-gray-600 dark:text-gray-400">{formatYen(item.unit_price)}</td>
+                    <td className="px-3 py-2 text-right font-medium text-gray-900 dark:text-gray-100">{formatYen(item.amount)}</td>
+                    <td className="px-3 py-2 text-gray-500 dark:text-gray-400">{item.memo || ""}</td>
                   </tr>
                 ))}
               </tbody>
@@ -271,23 +271,23 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
         )}
 
         {invoice.history && invoice.history.length > 0 && (
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">履歴</h3>
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">履歴</h3>
             <div className="space-y-3">
               {invoice.history.map((entry, index) => (
                 <div key={index} className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                  <div className="w-2 h-2 rounded-full bg-blue-400 dark:bg-blue-500 mt-1.5 shrink-0" />
                   <div>
-                    <p className="text-sm text-gray-900">
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[entry.old_status] || "bg-gray-100 text-gray-700"}`}>
+                    <p className="text-sm text-gray-900 dark:text-gray-100">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[entry.old_status] || "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"}`}>
                         {STATUS_LABELS[entry.old_status] || entry.old_status}
                       </span>
                       <span className="mx-1 text-gray-400">&rarr;</span>
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[entry.new_status] || "bg-gray-100 text-gray-700"}`}>
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[entry.new_status] || "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"}`}>
                         {STATUS_LABELS[entry.new_status] || entry.new_status}
                       </span>
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                       {entry.changed_at} - {entry.changed_by}
                     </p>
                   </div>

@@ -1,7 +1,10 @@
 import { redirect, Form, Link, useNavigation } from "react-router";
+import { useState } from "react";
 import type { Route } from "./+types/clients.$clientId";
 import { getSession } from "../lib/session";
 import { apiFetch } from "../lib/api";
+
+type SlackUser = { id: string; name: string; real_name: string };
 
 type Client = {
   client_id: string;
@@ -21,10 +24,23 @@ export async function loader({ request, context, params }: Route.LoaderArgs) {
   const session = await getSession(request, env.SESSION_SECRET);
   if (!session) throw redirect("/login");
 
-  const res = await apiFetch(env, session, `/clients/${params.clientId}`);
-  if (!res.ok) throw redirect("/clients");
-  const client: Client = await res.json();
-  return { client, user: session };
+  const [clientRes, slackRes] = await Promise.all([
+    apiFetch(env, session, `/clients/${params.clientId}`),
+    apiFetch(env, session, "/slack/users").catch(() => null),
+  ]);
+  if (!clientRes.ok) throw redirect("/clients");
+  const client: Client = await clientRes.json();
+
+  let slackUsers: SlackUser[] = [];
+  try {
+    if (slackRes && slackRes.ok) {
+      slackUsers = await slackRes.json();
+    }
+  } catch {
+    // Don't block the page if Slack users fetch fails
+  }
+
+  return { client, user: session, slackUsers };
 }
 
 export async function action({ request, context, params }: Route.ActionArgs) {
@@ -50,6 +66,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     const body = {
       name: formData.get("name") as string,
       slack_user_id: (formData.get("slack_user_id") as string) || undefined,
+      slack_real_name: (formData.get("slack_real_name") as string) || undefined,
       email: (formData.get("email") as string) || undefined,
       phone: (formData.get("phone") as string) || undefined,
       address: (formData.get("address") as string) || undefined,
@@ -73,40 +90,41 @@ export async function action({ request, context, params }: Route.ActionArgs) {
 }
 
 export default function ClientDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { client } = loaderData;
+  const { client, slackUsers } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+  const [slackRealName, setSlackRealName] = useState(client.slack_real_name || "");
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <nav className="flex gap-4 items-center">
-            <Link to="/" className="text-xl font-bold text-gray-800">incra</Link>
-            <Link to="/invoices" className="text-sm text-blue-600 hover:underline">請求書</Link>
-            <Link to="/clients" className="text-sm text-blue-600 hover:underline font-semibold">取引先</Link>
+            <Link to="/" className="text-xl font-bold text-gray-800 dark:text-white">incra</Link>
+            <Link to="/invoices" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">請求書</Link>
+            <Link to="/clients" className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-semibold">取引先</Link>
           </nav>
         </div>
       </header>
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-700">取引先詳細</h2>
-          <Link to="/clients" className="text-sm text-blue-600 hover:underline">一覧に戻る</Link>
+          <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300">取引先詳細</h2>
+          <Link to="/clients" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">一覧に戻る</Link>
         </div>
         {actionData?.error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded mb-4">
             {actionData.error}
           </div>
         )}
         {actionData?.success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4">
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded mb-4">
             更新しました。
           </div>
         )}
-        <Form method="post" className="bg-white shadow rounded-lg p-6 space-y-4">
+        <Form method="post" className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 space-y-4">
           <input type="hidden" name="intent" value="update" />
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               会社名 <span className="text-red-500">*</span>
             </label>
             <input
@@ -115,23 +133,34 @@ export default function ClientDetail({ loaderData, actionData }: Route.Component
               name="name"
               required
               defaultValue={client.name}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label htmlFor="slack_user_id" className="block text-sm font-medium text-gray-700 mb-1">
-              Slack User ID
+            <label htmlFor="slack_user_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Slack User
             </label>
-            <input
-              type="text"
+            <select
               id="slack_user_id"
               name="slack_user_id"
               defaultValue={client.slack_user_id || ""}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(e) => {
+                const user = slackUsers.find((u) => u.id === e.target.value);
+                setSlackRealName(user ? user.real_name : "");
+              }}
+            >
+              <option value="">選択してください</option>
+              {slackUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.real_name} ({u.name})
+                </option>
+              ))}
+            </select>
+            <input type="hidden" name="slack_real_name" value={slackRealName} />
           </div>
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               メールアドレス
             </label>
             <input
@@ -139,11 +168,11 @@ export default function ClientDetail({ loaderData, actionData }: Route.Component
               id="email"
               name="email"
               defaultValue={client.email || ""}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               電話番号
             </label>
             <input
@@ -151,11 +180,11 @@ export default function ClientDetail({ loaderData, actionData }: Route.Component
               id="phone"
               name="phone"
               defaultValue={client.phone || ""}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               住所
             </label>
             <textarea
@@ -163,11 +192,11 @@ export default function ClientDetail({ loaderData, actionData }: Route.Component
               name="address"
               rows={2}
               defaultValue={client.address || ""}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label htmlFor="bank_details" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="bank_details" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               振込先情報
             </label>
             <textarea
@@ -175,7 +204,7 @@ export default function ClientDetail({ loaderData, actionData }: Route.Component
               name="bank_details"
               rows={2}
               defaultValue={client.bank_details || ""}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div className="flex gap-3 pt-2">
@@ -192,7 +221,7 @@ export default function ClientDetail({ loaderData, actionData }: Route.Component
           <input type="hidden" name="intent" value="delete" />
           <button
             type="submit"
-            className="text-sm text-red-600 hover:text-red-800 underline"
+            className="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 underline"
             onClick={(e) => {
               if (!confirm("本当に削除しますか？")) e.preventDefault();
             }}

@@ -20,11 +20,13 @@ type InvoiceUseCase interface {
 
 type invoiceUseCase struct {
 	invoiceRepository repository.InvoiceRepository
+	clientRepository  repository.ClientRepository
 }
 
 func NewInvoiceUseCase() InvoiceUseCase {
 	return &invoiceUseCase{
 		invoiceRepository: infrastructure.NewInvoiceRepository(),
+		clientRepository:  infrastructure.NewClientRepository(),
 	}
 }
 
@@ -90,6 +92,16 @@ func (u *invoiceUseCase) TransitionStatus(invoiceId string, status domain.Invoic
 	if status == domain.InvoiceStatusSent {
 		if err := infrastructure.SendPDFGenerateMessage(updated); err != nil {
 			fmt.Printf("warning: failed to send PDF generate message: %v\n", err)
+		}
+		if updated.BillingClientId != "" {
+			client, err := u.clientRepository.GetClient(updated.BillingClientId)
+			if err != nil {
+				fmt.Printf("warning: failed to get client for notification: %v\n", err)
+			} else if client.SlackUserId != "" {
+				if err := infrastructure.SendInvoiceNotificationDM(client.SlackUserId, updated); err != nil {
+					fmt.Printf("warning: failed to send invoice notification DM: %v\n", err)
+				}
+			}
 		}
 	}
 	return updated, nil

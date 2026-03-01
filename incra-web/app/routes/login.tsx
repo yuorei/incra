@@ -51,13 +51,13 @@ export default function Login({ loaderData }: Route.ComponentProps) {
   const { error } = loaderData;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="bg-white rounded-lg shadow-md p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 w-full max-w-sm">
+        <h1 className="text-2xl font-bold text-center mb-6 text-gray-800 dark:text-white">
           incra にサインイン
         </h1>
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-red-700 dark:text-red-400 text-sm">
             {ERROR_MESSAGES[error] ?? "エラーが発生しました。再度お試しください。"}
           </div>
         )}
