@@ -189,10 +189,10 @@ module "counter_table" {
 module "pdf_queue" {
   source = "../../modules/sqs"
 
-  queue_name                 = "my-queue"
+  queue_name                  = "incra-pdf-generate-queue"
   enable_event_source_mapping = true
-  consumer_lambda_arn        = module.pdf_generate_lambda.function_arn
-  batch_size                 = 10
+  consumer_lambda_arn         = module.pdf_generate_lambda.function_arn
+  batch_size                  = 10
 }
 
 # ---------------------------------------------------------------------------
