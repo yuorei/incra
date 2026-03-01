@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,11 +20,13 @@ import (
 
 type ServerImpl struct {
 	invoiceUseCase usecase.InvoiceUseCase
+	clientUseCase  usecase.ClientUseCase
 }
 
 func NewServerImpl() *ServerImpl {
 	return &ServerImpl{
 		invoiceUseCase: usecase.NewInvoiceUseCase(),
+		clientUseCase:  usecase.NewClientUseCase(),
 	}
 }
 
@@ -32,20 +35,252 @@ func (s *ServerImpl) GetHealth(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, petstore.Health{Message: &health})
 }
 
-func (s *ServerImpl) GetInvoiceInvoiceId(ctx echo.Context, invoiceRequest petstore.InvoiceRequest) error {
-	_, err := s.invoiceUseCase.GetInvoice(*invoiceRequest.InvoiceId)
-	if err != nil {
-		return err
+func (s *ServerImpl) CreateInvoice(ctx echo.Context) error {
+	var req petstore.CreateInvoiceRequest
+	if err := ctx.Bind(&req); err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
-	return ctx.JSON(http.StatusOK, petstore.InvoiceResponse{
-		InvoiceId: invoiceRequest.InvoiceId,
-	})
+
+	items := make([]domain.InvoiceItem, len(req.Items))
+	for i, item := range req.Items {
+		memo := ""
+		if item.Memo != nil {
+			memo = *item.Memo
+		}
+		items[i] = domain.InvoiceItem{
+			Date:        item.Date,
+			Description: item.Description,
+			Quantity:    item.Quantity,
+			UnitPrice:   item.UnitPrice,
+			Amount:      item.Amount,
+			Memo:        memo,
+		}
+	}
+
+	additionalInfo := ""
+	if req.AdditionalInfo != nil {
+		additionalInfo = *req.AdditionalInfo
+	}
+
+	invoice := domain.Invoice{
+		BillingClientId:     req.BillingClientId,
+		BillingClientName:   req.BillingClientName,
+		DueDate:             req.DueDate,
+		BankDetails:         req.BankDetails,
+		AdditionalInfo:      additionalInfo,
+		Items:               items,
+		IssuerSlackUserId:   ctx.Request().Header.Get("X-Slack-User-Id"),
+		IssuerSlackRealName: ctx.Request().Header.Get("X-Slack-User-Name"),
+	}
+
+	created, err := s.invoiceUseCase.CreateInvoice(invoice)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return ctx.JSON(http.StatusCreated, domainInvoiceToAPI(created))
 }
 
-func (s *ServerImpl) PostInvoice(ctx echo.Context) error {
-	return ctx.JSON(http.StatusOK, petstore.InvoiceResponse{
-		InvoiceId: new(string),
-	})
+func (s *ServerImpl) ListInvoices(ctx echo.Context, params petstore.ListInvoicesParams) error {
+	status := ""
+	if params.Status != nil {
+		status = string(*params.Status)
+	}
+	limit := 0
+	if params.Limit != nil {
+		limit = *params.Limit
+	}
+	lastKey := ""
+	if params.LastKey != nil {
+		lastKey = *params.LastKey
+	}
+	issuerSlackUserId := ctx.Request().Header.Get("X-Slack-User-Id")
+	invoices, nextKey, err := s.invoiceUseCase.ListInvoices(issuerSlackUserId, status, limit, lastKey)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	apiInvoices := make([]petstore.Invoice, len(invoices))
+	for i, inv := range invoices {
+		apiInvoices[i] = domainInvoiceToAPI(inv)
+	}
+	resp := petstore.InvoiceListResponse{
+		Invoices: &apiInvoices,
+		NextKey:  &nextKey,
+	}
+	return ctx.JSON(http.StatusOK, resp)
+}
+
+func (s *ServerImpl) GetInvoice(ctx echo.Context, invoiceId string) error {
+	invoice, err := s.invoiceUseCase.GetInvoice(invoiceId)
+	if err != nil {
+		return ctx.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+	}
+	return ctx.JSON(http.StatusOK, domainInvoiceToAPI(invoice))
+}
+
+func (s *ServerImpl) UpdateInvoice(ctx echo.Context, invoiceId string) error {
+	var req petstore.UpdateInvoiceRequest
+	if err := ctx.Bind(&req); err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	invoice := domain.Invoice{InvoiceId: invoiceId}
+	if req.BillingClientId != nil {
+		invoice.BillingClientId = *req.BillingClientId
+	}
+	if req.BillingClientName != nil {
+		invoice.BillingClientName = *req.BillingClientName
+	}
+	if req.DueDate != nil {
+		invoice.DueDate = *req.DueDate
+	}
+	if req.BankDetails != nil {
+		invoice.BankDetails = *req.BankDetails
+	}
+	if req.AdditionalInfo != nil {
+		invoice.AdditionalInfo = *req.AdditionalInfo
+	}
+	if req.Items != nil {
+		items := make([]domain.InvoiceItem, len(*req.Items))
+		for i, item := range *req.Items {
+			memo := ""
+			if item.Memo != nil {
+				memo = *item.Memo
+			}
+			items[i] = domain.InvoiceItem{
+				Date:        item.Date,
+				Description: item.Description,
+				Quantity:    item.Quantity,
+				UnitPrice:   item.UnitPrice,
+				Amount:      item.Amount,
+				Memo:        memo,
+			}
+		}
+		invoice.Items = items
+	}
+
+	updated, err := s.invoiceUseCase.UpdateInvoice(invoice)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+	return ctx.JSON(http.StatusOK, domainInvoiceToAPI(updated))
+}
+
+func (s *ServerImpl) UpdateInvoiceStatus(ctx echo.Context, invoiceId string) error {
+	var req petstore.UpdateInvoiceStatusRequest
+	if err := ctx.Bind(&req); err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	changedBy := ctx.Request().Header.Get("X-Slack-User-Name")
+	if changedBy == "" {
+		changedBy = ctx.Request().Header.Get("X-Slack-User-Id")
+	}
+	updated, err := s.invoiceUseCase.TransitionStatus(invoiceId, domain.InvoiceStatus(req.Status), changedBy)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+	return ctx.JSON(http.StatusOK, domainInvoiceToAPI(updated))
+}
+
+func (s *ServerImpl) DeleteInvoice(ctx echo.Context, invoiceId string) error {
+	if err := s.invoiceUseCase.DeleteInvoice(invoiceId); err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+	return ctx.NoContent(http.StatusNoContent)
+}
+
+func (s *ServerImpl) ListClients(ctx echo.Context) error {
+	clients, err := s.clientUseCase.ListClients("")
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	resp := make([]petstore.ClientResponse, len(clients))
+	for i, c := range clients {
+		resp[i] = domainClientToAPI(c)
+	}
+	return ctx.JSON(http.StatusOK, resp)
+}
+
+func (s *ServerImpl) CreateClient(ctx echo.Context) error {
+	var req petstore.ClientRequest
+	if err := ctx.Bind(&req); err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+	client := domain.Client{
+		Name: req.Name,
+	}
+	if req.SlackUserId != nil {
+		client.SlackUserId = *req.SlackUserId
+	}
+	if req.SlackRealName != nil {
+		client.SlackRealName = *req.SlackRealName
+	}
+	if req.Email != nil {
+		client.Email = *req.Email
+	}
+	if req.Phone != nil {
+		client.Phone = *req.Phone
+	}
+	if req.Address != nil {
+		client.Address = *req.Address
+	}
+	if req.BankDetails != nil {
+		client.BankDetails = *req.BankDetails
+	}
+	created, err := s.clientUseCase.CreateClient(client)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return ctx.JSON(http.StatusCreated, domainClientToAPI(created))
+}
+
+func (s *ServerImpl) GetClient(ctx echo.Context, clientId string) error {
+	client, err := s.clientUseCase.GetClient(clientId)
+	if err != nil {
+		return ctx.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+	}
+	return ctx.JSON(http.StatusOK, domainClientToAPI(client))
+}
+
+func (s *ServerImpl) UpdateClient(ctx echo.Context, clientId string) error {
+	var req petstore.ClientRequest
+	if err := ctx.Bind(&req); err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+	client := domain.Client{
+		ClientId: clientId,
+		Name:     req.Name,
+	}
+	if req.SlackUserId != nil {
+		client.SlackUserId = *req.SlackUserId
+	}
+	if req.SlackRealName != nil {
+		client.SlackRealName = *req.SlackRealName
+	}
+	if req.Email != nil {
+		client.Email = *req.Email
+	}
+	if req.Phone != nil {
+		client.Phone = *req.Phone
+	}
+	if req.Address != nil {
+		client.Address = *req.Address
+	}
+	if req.BankDetails != nil {
+		client.BankDetails = *req.BankDetails
+	}
+	updated, err := s.clientUseCase.UpdateClient(client)
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return ctx.JSON(http.StatusOK, domainClientToAPI(updated))
+}
+
+func (s *ServerImpl) DeleteClient(ctx echo.Context, clientId string) error {
+	if err := s.clientUseCase.DeleteClient(clientId); err != nil {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+	return ctx.NoContent(http.StatusNoContent)
 }
 
 func (s *ServerImpl) SlackEventsHandler(c echo.Context) error {
@@ -102,28 +337,313 @@ func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	now := time.Now()
-	fmt.Println(slashCommand)
+
+	clients, err := s.clientUseCase.ListClients("")
+	if err != nil {
+		fmt.Printf("failed to list clients: %v\n", err)
+		return c.JSON(http.StatusOK, map[string]string{"text": "取引先一覧の取得に失敗しました"})
+	}
+
+	clientOptions := make([]*slack.OptionBlockObject, len(clients))
+	for i, cl := range clients {
+		clientOptions[i] = slack.NewOptionBlockObject(
+			cl.ClientId,
+			slack.NewTextBlockObject(slack.PlainTextType, cl.Name, false, false),
+			nil,
+		)
+	}
+
+	clientSelect := slack.NewSectionBlock(
+		slack.NewTextBlockObject(slack.MarkdownType, "*取引先*", false, false),
+		nil,
+		slack.NewAccessory(slack.NewOptionsSelectBlockElement(
+			slack.OptTypeStatic,
+			slack.NewTextBlockObject(slack.PlainTextType, "取引先を選択", false, false),
+			"client_select",
+			clientOptions...,
+		)),
+	)
+	clientSelect.BlockID = "client_block"
+
+	dueDatePicker := slack.NewInputBlock(
+		"due_date_block",
+		slack.NewTextBlockObject(slack.PlainTextType, "支払期限", false, false),
+		nil,
+		slack.NewDatePickerBlockElement("due_date_action"),
+	)
+
+	bankDetailsInput := slack.NewInputBlock(
+		"bank_details_block",
+		slack.NewTextBlockObject(slack.PlainTextType, "振込先", false, false),
+		nil,
+		slack.NewPlainTextInputBlockElement(
+			slack.NewTextBlockObject(slack.PlainTextType, "振込先を入力", false, false),
+			"bank_details_action",
+		),
+	)
+
+	itemDescInput := slack.NewInputBlock(
+		"item_desc_block",
+		slack.NewTextBlockObject(slack.PlainTextType, "品目名", false, false),
+		nil,
+		slack.NewPlainTextInputBlockElement(
+			slack.NewTextBlockObject(slack.PlainTextType, "品目名を入力", false, false),
+			"item_desc_action",
+		),
+	)
+
+	itemQuantityInput := slack.NewInputBlock(
+		"item_quantity_block",
+		slack.NewTextBlockObject(slack.PlainTextType, "数量", false, false),
+		nil,
+		slack.NewPlainTextInputBlockElement(
+			slack.NewTextBlockObject(slack.PlainTextType, "数量を入力", false, false),
+			"item_quantity_action",
+		),
+	)
+
+	itemUnitPriceInput := slack.NewInputBlock(
+		"item_unit_price_block",
+		slack.NewTextBlockObject(slack.PlainTextType, "単価", false, false),
+		nil,
+		slack.NewPlainTextInputBlockElement(
+			slack.NewTextBlockObject(slack.PlainTextType, "単価を入力", false, false),
+			"item_unit_price_action",
+		),
+	)
+
+	additionalInfoInput := slack.NewInputBlock(
+		"additional_info_block",
+		slack.NewTextBlockObject(slack.PlainTextType, "備考", false, false),
+		nil,
+		slack.NewPlainTextInputBlockElement(
+			slack.NewTextBlockObject(slack.PlainTextType, "備考を入力（任意）", false, false),
+			"additional_info_action",
+		),
+	)
+	additionalInfoInput.Optional = true
+
+	modalView := slack.ModalViewRequest{
+		Type:  slack.VTModal,
+		Title: slack.NewTextBlockObject(slack.PlainTextType, "請求書作成", false, false),
+		Submit: slack.NewTextBlockObject(slack.PlainTextType, "作成", false, false),
+		Close:  slack.NewTextBlockObject(slack.PlainTextType, "キャンセル", false, false),
+		Blocks: slack.Blocks{
+			BlockSet: []slack.Block{
+				clientSelect,
+				dueDatePicker,
+				bankDetailsInput,
+				itemDescInput,
+				itemQuantityInput,
+				itemUnitPriceInput,
+				additionalInfoInput,
+			},
+		},
+		PrivateMetadata: slashCommand.UserID,
+	}
+
+	_, err = api.OpenView(slashCommand.TriggerID, modalView)
+	if err != nil {
+		fmt.Printf("failed to open modal: %v\n", err)
+		return c.JSON(http.StatusOK, map[string]string{"text": "モーダルの表示に失敗しました"})
+	}
+
+	return c.String(http.StatusOK, "")
+}
+
+func (s *ServerImpl) SlackInteractionHandler(c echo.Context) error {
+	slackToken := os.Getenv("SLACK_TOKEN")
+	api := slack.New(slackToken)
+
+	payload := c.FormValue("payload")
+	if payload == "" {
+		return c.String(http.StatusBadRequest, "missing payload")
+	}
+
+	var interaction slack.InteractionCallback
+	if err := json.Unmarshal([]byte(payload), &interaction); err != nil {
+		return c.String(http.StatusBadRequest, "invalid payload")
+	}
+
+	if interaction.Type != slack.InteractionTypeViewSubmission {
+		return c.String(http.StatusOK, "")
+	}
+
+	values := interaction.View.State.Values
+
+	// 取引先
+	clientOption := values["client_block"]["client_select"].SelectedOption
+	billingClientId := clientOption.Value
+	billingClientName := clientOption.Text.Text
+
+	// 支払期限
+	dueDate := values["due_date_block"]["due_date_action"].SelectedDate
+
+	// 振込先
+	bankDetails := values["bank_details_block"]["bank_details_action"].Value
+
+	// 明細
+	itemDesc := values["item_desc_block"]["item_desc_action"].Value
+	quantityStr := values["item_quantity_block"]["item_quantity_action"].Value
+	unitPriceStr := values["item_unit_price_block"]["item_unit_price_action"].Value
+
+	quantity, err := strconv.Atoi(quantityStr)
+	if err != nil {
+		errResp := slack.NewErrorsViewSubmissionResponse(map[string]string{
+			"item_quantity_block": "数量は数値で入力してください",
+		})
+		return c.JSON(http.StatusOK, errResp)
+	}
+
+	unitPrice, err := strconv.Atoi(unitPriceStr)
+	if err != nil {
+		errResp := slack.NewErrorsViewSubmissionResponse(map[string]string{
+			"item_unit_price_block": "単価は数値で入力してください",
+		})
+		return c.JSON(http.StatusOK, errResp)
+	}
+
+	amount := quantity * unitPrice
+
+	// 備考
+	additionalInfo := values["additional_info_block"]["additional_info_action"].Value
+
+	// 発行者情報
+	issuerSlackUserId := interaction.View.PrivateMetadata
+	issuerSlackRealName := interaction.User.Name
+
 	invoice := domain.Invoice{
-		AdditionalInfo:       &slashCommand.Text,
-		BillingSlackRealName: &slashCommand.UserName,
-		BillingSlackUserId:   &slashCommand.UserID,
-		InvoiceId:            &slashCommand.Command,
-		IssuerSlackRealName:  &slashCommand.UserName,
-		IssuerSlackUserId:    &slashCommand.UserID,
-		PaidAmount:           new(int),
-		PaidDate:             &now,
-	}
-	res, err := s.invoiceUseCase.CreateInvoice(invoice)
-	if err != nil {
-		return err
-	}
-	fmt.Println(res)
-
-	_, _, err = api.PostMessage(slashCommand.ChannelID, slack.MsgOptionText(slashCommand.Text, false))
-	if err != nil {
-		return err
+		BillingClientId:     billingClientId,
+		BillingClientName:   billingClientName,
+		DueDate:             dueDate,
+		BankDetails:         bankDetails,
+		AdditionalInfo:      additionalInfo,
+		IssuerSlackUserId:   issuerSlackUserId,
+		IssuerSlackRealName: issuerSlackRealName,
+		Items: []domain.InvoiceItem{
+			{
+				Date:        time.Now().Format("2006-01-02"),
+				Description: itemDesc,
+				Quantity:    quantity,
+				UnitPrice:   unitPrice,
+				Amount:      amount,
+			},
+		},
 	}
 
-	return nil
+	created, err := s.invoiceUseCase.CreateInvoice(invoice)
+	if err != nil {
+		fmt.Printf("failed to create invoice: %v\n", err)
+		return c.String(http.StatusOK, "")
+	}
+
+	message := fmt.Sprintf("請求書を作成しました\n• 請求書ID: %s\n• 取引先: %s\n• 合計金額: ¥%s\n• 支払期限: %s",
+		created.InvoiceId, created.BillingClientName, formatAmount(created.TotalAmount), created.DueDate)
+
+	_, _, err = api.PostMessage(issuerSlackUserId, slack.MsgOptionText(message, false))
+	if err != nil {
+		fmt.Printf("failed to send message: %v\n", err)
+	}
+
+	return c.String(http.StatusOK, "")
+}
+
+func domainInvoiceToAPI(inv domain.Invoice) petstore.Invoice {
+	status := petstore.InvoiceStatus(inv.Status)
+	totalAmount := inv.TotalAmount
+	paidAmount := inv.PaidAmount
+
+	apiItems := make([]petstore.InvoiceItem, len(inv.Items))
+	for i, item := range inv.Items {
+		apiItem := petstore.InvoiceItem{
+			Date:        item.Date,
+			Description: item.Description,
+			Quantity:    item.Quantity,
+			UnitPrice:   item.UnitPrice,
+			Amount:      item.Amount,
+		}
+		if item.Memo != "" {
+			memo := item.Memo
+			apiItem.Memo = &memo
+		}
+		apiItems[i] = apiItem
+	}
+
+	apiHistory := make([]petstore.HistoryEntry, len(inv.History))
+	for i, h := range inv.History {
+		changedAt := h.ChangedAt
+		oldStatus := h.OldStatus
+		newStatus := h.NewStatus
+		changedBy := h.ChangedBy
+		apiHistory[i] = petstore.HistoryEntry{
+			ChangedAt: &changedAt,
+			OldStatus: &oldStatus,
+			NewStatus: &newStatus,
+			ChangedBy: &changedBy,
+		}
+	}
+
+	result := petstore.Invoice{
+		InvoiceId:           &inv.InvoiceId,
+		Status:              &status,
+		BillingClientId:     &inv.BillingClientId,
+		BillingClientName:   &inv.BillingClientName,
+		TotalAmount:         &totalAmount,
+		DueDate:             &inv.DueDate,
+		BankDetails:         &inv.BankDetails,
+		CreatedAt:           &inv.CreatedAt,
+		UpdatedAt:           &inv.UpdatedAt,
+		IssuerSlackUserId:   &inv.IssuerSlackUserId,
+		IssuerSlackRealName: &inv.IssuerSlackRealName,
+		Items:               &apiItems,
+		History:             &apiHistory,
+	}
+	if inv.AdditionalInfo != "" {
+		result.AdditionalInfo = &inv.AdditionalInfo
+	}
+	if inv.PdfUrl != "" {
+		result.PdfUrl = &inv.PdfUrl
+	}
+	if inv.PaidAmount != 0 {
+		result.PaidAmount = &paidAmount
+	}
+	if inv.PaidDate != "" {
+		result.PaidDate = &inv.PaidDate
+	}
+	if inv.PaidMethod != "" {
+		result.PaidMethod = &inv.PaidMethod
+	}
+	return result
+}
+
+func domainClientToAPI(c domain.Client) petstore.ClientResponse {
+	return petstore.ClientResponse{
+		ClientId:      &c.ClientId,
+		Name:          &c.Name,
+		SlackUserId:   &c.SlackUserId,
+		SlackRealName: &c.SlackRealName,
+		Email:         &c.Email,
+		Phone:         &c.Phone,
+		Address:       &c.Address,
+		BankDetails:   &c.BankDetails,
+		RegisteredBy:  &c.RegisteredBy,
+		CreatedAt:     &c.CreatedAt,
+		UpdatedAt:     &c.UpdatedAt,
+	}
+}
+
+func formatAmount(amount int) string {
+	s := strconv.Itoa(amount)
+	n := len(s)
+	if n <= 3 {
+		return s
+	}
+	var result strings.Builder
+	for i, ch := range s {
+		if i > 0 && (n-i)%3 == 0 {
+			result.WriteByte(',')
+		}
+		result.WriteRune(ch)
+	}
+	return result.String()
 }
