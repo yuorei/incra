@@ -1,9 +1,9 @@
-name: "Incra API Server Plan"
+name: "Infra Terraform Plan"
 
 on:
   pull_request:
     paths:
-      - incra_api_server/terraform/**
+      - infra/**
 
 permissions:
   id-token: write
@@ -31,40 +31,50 @@ jobs:
       - name: Terraform Format
         id: fmt
         run: terraform fmt -check -recursive
-        working-directory: incra_api_server/terraform
+        working-directory: infra/environments/prod
 
       - name: Terraform Init
         id: init
         run: terraform init
-        working-directory: incra_api_server/terraform
+        working-directory: infra/environments/prod
 
       - name: Terraform Validate
         id: validate
         run: terraform validate -no-color
-        working-directory: incra_api_server/terraform
+        working-directory: infra/environments/prod
 
       - name: Terraform Plan
         id: plan
         env:
-          QUEUE_URL: ${{ secrets.QUEUE_URL }}
           SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+          SLACK_CLIENT_ID: ${{ secrets.SLACK_CLIENT_ID }}
+          SLACK_CLIENT_SECRET: ${{ secrets.SLACK_CLIENT_SECRET }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          WEB_BASE_URL: ${{ secrets.WEB_BASE_URL }}
+          FONT_NAME: ${{ secrets.FONT_NAME }}
+          FONT_PATH: ${{ secrets.FONT_PATH }}
         run: |
           : > plan_raw.txt
           terraform plan -no-color \
-            -var "queue_url=${QUEUE_URL}" \
             -var "slack_token=${SLACK_TOKEN}" \
+            -var "slack_client_id=${SLACK_CLIENT_ID}" \
+            -var "slack_client_secret=${SLACK_CLIENT_SECRET}" \
+            -var "session_secret=${SESSION_SECRET}" \
+            -var "web_base_url=${WEB_BASE_URL}" \
+            -var "font_name=${FONT_NAME}" \
+            -var "font_path=${FONT_PATH}" \
             | tee -a plan_raw.txt
-        working-directory: incra_api_server/terraform
+        working-directory: infra/environments/prod
 
       - name: Reformat Plan
         if: success() || failure()
-        working-directory: incra_api_server/terraform
+        working-directory: infra/environments/prod
         run: |
           sed -E 's/^([[:space:]]+)([-+])/\2\1/g' plan_raw.txt > plan.txt
 
       - name: Put Plan in Env Var
         if: success() || failure()
-        working-directory: incra_api_server/terraform
+        working-directory: infra/environments/prod
         run: |
           PLAN=$(cat plan.txt)
           echo "PLAN<<EOF" >> $GITHUB_ENV
@@ -100,7 +110,7 @@ jobs:
 
             </details>
 
-            *Pusher: @${{ github.actor }}, Working Directory: \`incra_api_server/terraform\``;
+            *Pusher: @${{ github.actor }}, Working Directory: \`infra/environments/prod\``;
 
             if (botComment) {
               await github.rest.issues.updateComment({
