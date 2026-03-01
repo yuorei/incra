@@ -1,22 +1,40 @@
-provider "aws" {
-  region = "ap-northeast-1"
+terraform {
+  required_version = ">= 1.5.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.90"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
+  }
+
+  # S3バックエンド（バケット作成後にコメント解除）
+  # backend "s3" {
+  #   bucket  = "incra-terraform-state"
+  #   key     = "global/oidc/terraform.tfstate"
+  #   region  = "ap-northeast-1"
+  #   encrypt = true
+  # }
 }
 
-# see: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc_verify-thumbprint.html
-# see: https://github.com/aws-actions/configure-aws-credentials/issues/357#issuecomment-1011642085
+provider "aws" {
+  region = var.region
+}
+
 data "tls_certificate" "github_actions" {
   url = "https://token.actions.githubusercontent.com/.well-known/openid-configuration"
 }
 
 resource "aws_iam_openid_connect_provider" "github_actions" {
-  url            = "https://token.actions.githubusercontent.com"
-  client_id_list = ["sts.amazonaws.com"]
-  # ref: https://qiita.com/minamijoyo/items/eac99e4b1ca0926c4310
-  # ref: https://zenn.dev/yukin01/articles/github-actions-oidc-provider-terraform
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = [data.tls_certificate.github_actions.certificates[0].sha1_fingerprint]
 }
 
-# GitHub Actions側からはこのIAM Roleを指定する
 resource "aws_iam_role" "github_actions" {
   name               = "github-actions"
   assume_role_policy = data.aws_iam_policy_document.github_actions.json
@@ -33,7 +51,6 @@ locals {
   ]
 }
 
-# see: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services#configuring-the-role-and-trust-policy
 data "aws_iam_policy_document" "github_actions" {
   statement {
     actions = [
@@ -47,7 +64,6 @@ data "aws_iam_policy_document" "github_actions" {
       ]
     }
 
-    # OIDCを利用できる対象のGitHub Repositoryを制限する
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
@@ -56,7 +72,6 @@ data "aws_iam_policy_document" "github_actions" {
   }
 }
 
-# 実際に利用する際にはこれに加えてdeny定義を追加付与するなどして、CI/CD用にカスタマイズすることを強く推奨
 resource "aws_iam_role_policy_attachment" "admin" {
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
   role       = aws_iam_role.github_actions.name
