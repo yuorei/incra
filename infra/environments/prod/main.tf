@@ -205,7 +205,7 @@ module "api_server_lambda" {
   function_name = "api-server"
   filename      = "./lambda/bootstrap.zip"
   handler       = "bootstrap"
-  runtime       = "provided.al2"
+  runtime       = "provided.al2023"
   role_arn      = module.api_server_iam.role_arn
 
   environment_variables = {
@@ -229,7 +229,7 @@ module "reminder_lambda" {
   function_name = "incra-reminder-prod"
   filename      = "./lambda/reminder.zip"
   handler       = "bootstrap"
-  runtime       = "provided.al2"
+  runtime       = "provided.al2023"
   role_arn      = module.reminder_iam.role_arn
 
   environment_variables = {
