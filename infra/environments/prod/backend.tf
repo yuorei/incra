@@ -10,3 +10,11 @@
 #   aws s3api put-bucket-versioning \
 #     --bucket incra-terraform-state \
 #     --versioning-configuration Status=Enabled
+#
+# DynamoDBロックテーブル作成コマンド:
+#   aws dynamodb create-table \
+#     --table-name incra-terraform-locks \
+#     --attribute-definitions AttributeName=LockID,AttributeType=S \
+#     --key-schema AttributeName=LockID,KeyType=HASH \
+#     --billing-mode PAY_PER_REQUEST \
+#     --region ap-northeast-1

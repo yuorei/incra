@@ -123,11 +123,20 @@ npm run dev
 
 ## CI/CD
 
-GitHub Actionsを使用した自動デプロイが設定されています:
+GitHub Actionsを使用したCI/CDパイプラインが設定されています:
 
-- PR作成時に `infra/environments/prod` のTerraform planを実行
-- PRマージ時に自動で `infra/environments/prod` のTerraform applyを実行
-- Cloudflare Workersは `wrangler deploy` で自動デプロイ
+### PR時（CI）
+- `infra/` 変更時にTerraform planを自動実行し、PRコメントに結果を表示
+- `/apply` コメントで手動Terraform apply（レビュー後の即時適用）
+
+### mainマージ時（CD）
+- `incra_api_server/`, `pdf_generate/`, `infra/` の変更を検知して自動デプロイ
+- Go Lambda（API Server + Reminder）とPython Lambda（PDF Generator）をビルド
+- OIDC認証でAWSにアクセスし、Terraform apply -auto-approveを実行
+- Terraform stateはS3（`incra-terraform-state`）で管理、DynamoDB（`incra-terraform-locks`）でロック
+
+### Webフロントエンド
+- Cloudflare Workersは `wrangler deploy` でデプロイ
 
 ## 開発ガイド
 

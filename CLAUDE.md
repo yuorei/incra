@@ -184,9 +184,14 @@ terraform plan
 
 ## CI/CD Workflows
 
-- `.github/workflows/incra_api_server_plan.yaml` - `infra/environments/prod` の Terraform plan
-- `.github/workflows/pdf_generate_plan.yaml` - `infra/environments/prod` の Terraform plan
-- PRマージ時に自動でTerraform apply実行（`infra/environments/prod`）
+- `.github/workflows/incra_api_server_plan.yaml` - PRで `infra/` 変更時にTerraform plan実行
+- `.github/workflows/pdf_generate_plan.yaml` - PRで `infra/` 変更時にTerraform plan実行（Python Lambda含む）
+- `.github/workflows/pdf_generate_apply.yaml` - `/apply` コメントでTerraform apply実行（手動トリガー）
+- `.github/workflows/deploy.yaml` - **mainブランチへのpush時に自動デプロイ**
+  - トリガー: `incra_api_server/`, `pdf_generate/`, `infra/` のいずれかが変更された場合
+  - Go Lambda（API Server + Reminder）とPython Lambda（PDF Generator）をビルド
+  - AWS OIDC認証 → Terraform apply -auto-approve
+  - Terraform stateはS3バックエンド（`incra-terraform-state`）+ DynamoDBロック（`incra-terraform-locks`）
 - Terraform fmt checkが含まれる（`terraform fmt -check -recursive`）
 
 ## Coding Conventions

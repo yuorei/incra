@@ -8,13 +8,13 @@ terraform {
     }
   }
 
-  # S3バックエンド（バケット作成後にコメント解除）
-  # backend "s3" {
-  #   bucket  = "incra-terraform-state"
-  #   key     = "prod/terraform.tfstate"
-  #   region  = "ap-northeast-1"
-  #   encrypt = true
-  # }
+  backend "s3" {
+    bucket         = "incra-terraform-state"
+    key            = "prod/terraform.tfstate"
+    region         = "ap-northeast-1"
+    encrypt        = true
+    dynamodb_table = "incra-terraform-locks"
+  }
 }
 
 provider "aws" {

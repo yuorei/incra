@@ -1,0 +1,101 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - incra_api_server/**
+      - pdf_generate/**
+      - infra/**
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --- Go Lambda ビルド ---
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: incra_api_server/go.mod
+
+      - name: Build API Server Lambda
+        working-directory: incra_api_server
+        run: |
+          GOOS=linux GOARCH=amd64 go build -tags lambda.norpc -o bootstrap main.go
+          zip bootstrap.zip bootstrap
+          rm bootstrap
+
+      - name: Build Reminder Lambda
+        working-directory: incra_api_server
+        run: |
+          GOOS=linux GOARCH=amd64 go build -tags lambda.norpc -o bootstrap ./cmd/reminder/main.go
+          zip reminder.zip bootstrap
+          rm bootstrap
+
+      # --- Python Lambda ビルド ---
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --platform manylinux2014_x86_64 --only-binary=:all: --implementation cp --target pdf_generate/src -r pdf_generate/src/requirements.txt
+
+      - name: Zip Python Lambda
+        run: zip -r python_lambda.zip pdf_generate/src
+
+      # --- Lambda zip を配置 ---
+      - name: Create lambda output directory
+        run: mkdir -p infra/environments/prod/lambda
+
+      - name: Move Lambda zips
+        run: |
+          mv incra_api_server/bootstrap.zip infra/environments/prod/lambda/
+          mv incra_api_server/reminder.zip infra/environments/prod/lambda/
+          mv python_lambda.zip infra/environments/prod/lambda/python_lambda.zip
+
+      # --- AWS 認証 ---
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions
+          aws-region: ap-northeast-1
+
+      # --- Terraform ---
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: infra/environments/prod
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: infra/environments/prod
+        env:
+          SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+          SLACK_CLIENT_ID: ${{ secrets.SLACK_CLIENT_ID }}
+          SLACK_CLIENT_SECRET: ${{ secrets.SLACK_CLIENT_SECRET }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          WEB_BASE_URL: ${{ secrets.WEB_BASE_URL }}
+          FONT_NAME: ${{ secrets.FONT_NAME }}
+          FONT_PATH: ${{ secrets.FONT_PATH }}
+        run: |
+          terraform apply -auto-approve \
+            -var "slack_token=${SLACK_TOKEN}" \
+            -var "slack_client_id=${SLACK_CLIENT_ID}" \
+            -var "slack_client_secret=${SLACK_CLIENT_SECRET}" \
+            -var "session_secret=${SESSION_SECRET}" \
+            -var "web_base_url=${WEB_BASE_URL}" \
+            -var "font_name=${FONT_NAME}" \
+            -var "font_path=${FONT_PATH}"
