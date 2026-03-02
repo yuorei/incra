@@ -510,7 +510,7 @@ func (s *ServerImpl) handleBlockActions(c echo.Context, interaction slack.Intera
 		successMessage = fmt.Sprintf("請求書 %s の支払いを報告しました", invoiceId)
 	case "confirm_payment":
 		targetStatus = domain.InvoiceStatusConfirmed
-		successMessage = fmt.Sprintf("請求書 %s の支払いを確認しました", invoiceId)
+		successMessage = fmt.Sprintf("請求書 %s の支払いを承認しました", invoiceId)
 	case "reject_payment":
 		targetStatus = domain.InvoiceStatusSent
 		successMessage = fmt.Sprintf("請求書 %s の支払いを差し戻しました", invoiceId)

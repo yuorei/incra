@@ -40,7 +40,7 @@ const STATUS_LABELS: Record<string, string> = {
   draft: "下書き",
   sent: "送信済み",
   paid: "支払い済み",
-  confirmed: "確認済み",
+  confirmed: "承認済み",
   cancelled: "キャンセル",
 };
 
@@ -251,7 +251,7 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
                     disabled={isSubmitting}
                     className="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:opacity-50"
                   >
-                    確認
+                    承認
                   </button>
                 </Form>
                 <Form method="post">

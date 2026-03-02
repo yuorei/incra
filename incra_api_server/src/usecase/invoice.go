@@ -66,7 +66,7 @@ func (u *invoiceUseCase) UpdateInvoice(invoice domain.Invoice) (domain.Invoice, 
 		return domain.Invoice{}, err
 	}
 	if existing.Status != domain.InvoiceStatusDraft {
-		return domain.Invoice{}, fmt.Errorf("only draft invoices can be updated")
+		return domain.Invoice{}, fmt.Errorf("下書き状態の請求書のみ編集できます")
 	}
 	total := 0
 	for _, item := range invoice.Items {
@@ -145,7 +145,7 @@ func (u *invoiceUseCase) DeleteInvoice(invoiceId string) error {
 		return err
 	}
 	if existing.Status != domain.InvoiceStatusDraft {
-		return fmt.Errorf("only draft invoices can be deleted")
+		return fmt.Errorf("下書き状態の請求書のみ削除できます")
 	}
 	return u.invoiceRepository.DeleteInvoice(invoiceId)
 }
@@ -163,7 +163,7 @@ func validateStatusTransition(from, to domain.InvoiceStatus) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("invalid status transition from %s to %s", from, to)
+	return fmt.Errorf("ステータスを %s から %s に変更することはできません", from, to)
 }
 
 func validatePermission(invoice domain.Invoice, targetStatus domain.InvoiceStatus, changedByUserId string) error {
@@ -175,7 +175,7 @@ func validatePermission(invoice domain.Invoice, targetStatus domain.InvoiceStatu
 		// }
 	case domain.InvoiceStatusConfirmed:
 		if changedByUserId != invoice.IssuerSlackUserId {
-			return fmt.Errorf("支払いの確認は請求書の発行者のみが操作できます。")
+			return fmt.Errorf("支払いの承認は請求書の発行者のみが操作できます。")
 		}
 	case domain.InvoiceStatusSent:
 		if invoice.Status == domain.InvoiceStatusPaid && changedByUserId != invoice.IssuerSlackUserId {

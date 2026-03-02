@@ -21,7 +21,7 @@ const STATUS_LABELS: Record<string, string> = {
   draft: "下書き",
   sent: "送信済み",
   paid: "支払い済み",
-  confirmed: "確認済み",
+  confirmed: "承認済み",
   cancelled: "キャンセル",
 };
 
@@ -74,7 +74,7 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
     { label: "下書き", value: "draft" },
     { label: "送信済み", value: "sent" },
     { label: "支払い済み", value: "paid" },
-    { label: "確認済み", value: "confirmed" },
+    { label: "承認済み", value: "confirmed" },
     { label: "キャンセル", value: "cancelled" },
   ];
 

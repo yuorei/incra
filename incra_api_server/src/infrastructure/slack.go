@@ -80,7 +80,7 @@ func SendPaymentConfirmationRequestDM(issuerSlackUserId string, invoice domain.I
 	confirmBtn := slacklib.NewButtonBlockElement(
 		"confirm_payment",
 		invoice.InvoiceId,
-		slacklib.NewTextBlockObject(slacklib.PlainTextType, "確認", false, false),
+		slacklib.NewTextBlockObject(slacklib.PlainTextType, "承認", false, false),
 	)
 	confirmBtn.Style = slacklib.StylePrimary
 
@@ -110,7 +110,7 @@ func SendPaymentConfirmedDM(slackUserId string, invoice domain.Invoice) error {
 	api := slacklib.New(slackToken)
 
 	message := fmt.Sprintf(
-		"支払いが確認されました\n• 請求書ID: %s\n• 合計金額: ¥%s\n<%s/invoices/%s|請求書を確認する>",
+		"支払いが承認されました\n• 請求書ID: %s\n• 合計金額: ¥%s\n<%s/invoices/%s|請求書を確認する>",
 		invoice.InvoiceId, slackFormatAmount(invoice.TotalAmount), webBaseURL, invoice.InvoiceId,
 	)
 
