@@ -5,8 +5,11 @@ import { apiFetch } from "../lib/api";
 
 type Invoice = {
   invoice_id: string;
-  billing_client_id: string;
+  billing_client_id?: string;
+  billing_slack_user_id?: string;
   billing_client_name?: string;
+  issuer_slack_user_id?: string;
+  issuer_slack_real_name?: string;
   total_amount: number;
   due_date: string;
   status: string;
@@ -41,8 +44,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const url = new URL(request.url);
   const status = url.searchParams.get("status");
+  const type = url.searchParams.get("type");
   const params = new URLSearchParams();
   if (status) params.set("status", status);
+  if (type === "received") params.set("type", "received");
   const query = params.toString() ? `?${params.toString()}` : "";
 
   const res = await apiFetch(env, session, `/invoices${query}`);
@@ -56,8 +61,15 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
   const { invoices } = loaderData;
   const [searchParams] = useSearchParams();
   const currentStatus = searchParams.get("status") || "";
+  const currentType = searchParams.get("type") || "";
+  const isReceived = currentType === "received";
 
-  const tabs = [
+  const typeTabs = [
+    { label: "発行した請求書", value: "" },
+    { label: "受け取った請求書", value: "received" },
+  ];
+
+  const statusTabs = [
     { label: "全て", value: "" },
     { label: "下書き", value: "draft" },
     { label: "送信済み", value: "sent" },
@@ -66,6 +78,16 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
     { label: "キャンセル", value: "cancelled" },
   ];
 
+  function buildUrl(opts: { type?: string; status?: string }) {
+    const p = new URLSearchParams();
+    const t = opts.type !== undefined ? opts.type : currentType;
+    const s = opts.status !== undefined ? opts.status : currentStatus;
+    if (t) p.set("type", t);
+    if (s) p.set("status", s);
+    const q = p.toString();
+    return q ? `/invoices?${q}` : "/invoices";
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow-sm">
@@ -73,7 +95,6 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
           <nav className="flex gap-4 items-center">
             <Link to="/" className="text-xl font-bold text-gray-800 dark:text-white">incra</Link>
             <Link to="/invoices" className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-semibold">請求書</Link>
-            <Link to="/clients" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">取引先</Link>
           </nav>
           <Link to="/invoices/new" className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
             新規作成
@@ -82,11 +103,26 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
       </header>
       <main className="max-w-6xl mx-auto px-4 py-8">
         <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">請求書一覧</h2>
-        <div className="flex gap-2 mb-6">
-          {tabs.map((tab) => (
+        <div className="flex gap-2 mb-4">
+          {typeTabs.map((tab) => (
             <Link
               key={tab.value}
-              to={tab.value ? `/invoices?status=${tab.value}` : "/invoices"}
+              to={buildUrl({ type: tab.value, status: "" })}
+              className={`px-3 py-1.5 rounded text-sm ${
+                currentType === tab.value
+                  ? "bg-blue-600 text-white"
+                  : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}
+            >
+              {tab.label}
+            </Link>
+          ))}
+        </div>
+        <div className="flex gap-2 mb-6">
+          {statusTabs.map((tab) => (
+            <Link
+              key={tab.value}
+              to={buildUrl({ status: tab.value })}
               className={`px-3 py-1.5 rounded text-sm ${
                 currentStatus === tab.value
                   ? "bg-blue-600 text-white"
@@ -105,7 +141,11 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
               <thead className="bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700">
                 <tr>
                   <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">請求書ID</th>
-                  <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">取引先</th>
+                  {isReceived ? (
+                    <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">発行者</th>
+                  ) : (
+                    <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">請求先</th>
+                  )}
                   <th className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">合計金額</th>
                   <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">期限</th>
                   <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">ステータス</th>
@@ -116,7 +156,12 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
                 {invoices.map((inv) => (
                   <tr key={inv.invoice_id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-4 py-3 text-gray-900 dark:text-gray-100 font-mono text-xs">{inv.invoice_id.slice(0, 8)}</td>
-                    <td className="px-4 py-3 text-gray-900 dark:text-gray-100">{inv.billing_client_name || inv.billing_client_id}</td>
+                    <td className="px-4 py-3 text-gray-900 dark:text-gray-100">
+                      {isReceived
+                        ? (inv.issuer_slack_real_name || inv.issuer_slack_user_id || "-")
+                        : (inv.billing_client_name || inv.billing_slack_user_id || inv.billing_client_id || "-")
+                      }
+                    </td>
                     <td className="px-4 py-3 text-right text-gray-900 dark:text-gray-100 font-medium">{formatYen(inv.total_amount)}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{inv.due_date}</td>
                     <td className="px-4 py-3">

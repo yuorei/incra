@@ -62,8 +62,6 @@ module "api_server_iam" {
       resources = [
         module.invoices_table.table_arn,
         "${module.invoices_table.table_arn}/index/*",
-        module.clients_table.table_arn,
-        "${module.clients_table.table_arn}/index/*",
         module.counter_table.table_arn
       ]
     }
@@ -128,7 +126,8 @@ module "invoices_table" {
   attributes = [
     { name = "invoice_id", type = "S" },
     { name = "issuer_slack_user_id", type = "S" },
-    { name = "created_at", type = "S" }
+    { name = "created_at", type = "S" },
+    { name = "billing_slack_user_id", type = "S" }
   ]
 
   global_secondary_indexes = [
@@ -137,29 +136,37 @@ module "invoices_table" {
       hash_key        = "issuer_slack_user_id"
       range_key       = "created_at"
       projection_type = "ALL"
-    }
-  ]
-}
-
-module "clients_table" {
-  source = "../../modules/dynamodb"
-
-  table_name = var.client_table_name
-  hash_key   = "client_id"
-
-  attributes = [
-    { name = "client_id", type = "S" },
-    { name = "slack_user_id", type = "S" }
-  ]
-
-  global_secondary_indexes = [
+    },
     {
-      name            = "slack_user_id-index"
-      hash_key        = "slack_user_id"
+      name            = "billing_slack_user_id-created_at-index"
+      hash_key        = "billing_slack_user_id"
+      range_key       = "created_at"
       projection_type = "ALL"
     }
   ]
 }
+
+# NOTE: clients_table is no longer used by the application.
+# Kept commented out for data preservation. Remove after confirming data migration.
+# module "clients_table" {
+#   source = "../../modules/dynamodb"
+#
+#   table_name = var.client_table_name
+#   hash_key   = "client_id"
+#
+#   attributes = [
+#     { name = "client_id", type = "S" },
+#     { name = "slack_user_id", type = "S" }
+#   ]
+#
+#   global_secondary_indexes = [
+#     {
+#       name            = "slack_user_id-index"
+#       hash_key        = "slack_user_id"
+#       projection_type = "ALL"
+#     }
+#   ]
+# }
 
 module "counter_table" {
   source = "../../modules/dynamodb"
@@ -207,7 +214,6 @@ module "api_server_lambda" {
     SESSION_SECRET      = var.session_secret
     DYNAMODB_REGION     = var.region
     INVOICE_TABLE_NAME  = var.invoice_table_name
-    CLIENT_TABLE_NAME   = var.client_table_name
     COUNTER_TABLE_NAME  = var.counter_table_name
     WEB_BASE_URL        = var.web_base_url
   }

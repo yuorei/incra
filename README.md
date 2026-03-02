@@ -1,6 +1,6 @@
 # Incra - 請求書管理システム
 
-請求書の作成、発行、ステータス管理、PDF生成、取引先管理を行うフルスタックアプリケーションです。
+請求書の作成、発行、ステータス管理、PDF生成を行うフルスタックアプリケーションです。SlackユーザーIDベースで請求先を管理し、発行済み・受領済み請求書の両方を閲覧できます。
 
 ## システム構成
 
@@ -12,14 +12,14 @@ Go製のバックエンドAPIサーバー。AWS Lambda上で動作します。
 - **アーキテクチャ**: クリーンアーキテクチャ（domain / usecase / ui / infrastructure）
 - **主な機能**:
   - 請求書CRUD（作成・一覧・詳細・更新・削除）
+  - 発行済み請求書と受領済み請求書の一覧取得（`type=issued|received`）
   - ステータス管理（draft → sent → paid → confirmed / cancelled）
   - 二段階支払い確認フロー（受取人が支払い報告 → 発行者が確認/差し戻し）
   - 権限ベースのステータス遷移バリデーション
-  - 取引先マスタ管理
   - 請求書番号の自動採番（INV-YYYY-NNNN）
   - SQS経由のPDF生成トリガー
-  - sent遷移時の取引先Slack DM通知
-  - Slackスラッシュコマンド対応（即sent遷移、取引先任意）
+  - sent遷移時の請求先Slack DM通知（`billing_slack_user_id`ベース）
+  - Slackスラッシュコマンド対応（即sent遷移）
   - Slackワークスペースユーザー一覧API
 - **デプロイ**: AWS Lambda + API Gateway
 
@@ -38,7 +38,7 @@ Python製のPDF生成Lambda関数。請求書のPDF出力を担当します。
 - **技術スタック**: Python 3.10, ReportLab, slack_sdk
 - **主な機能**:
   - SQSからフルインボイスデータを受信してPDF生成
-  - Slack DMで請求先クライアントへPDFファイル送信
+  - Slack DMで請求先ユーザーへPDFファイル送信
 - **デプロイ**: AWS Lambda
 
 ### 4. Web Frontend (incra-web/)
@@ -48,7 +48,7 @@ React Router製のフロントエンドアプリケーション。Cloudflare Wor
 - **技術スタック**: React 19, React Router v7, TailwindCSS v4, TypeScript
 - **主な機能**:
   - 請求書の作成・一覧・詳細・編集・ステータス遷移UI
-  - 取引先の登録・一覧・詳細・編集・削除UI
+  - 発行済み・受領済みタブ切替による請求書一覧表示
   - Slack OAuthログイン
   - SSR (Server-Side Rendering) 対応
 - **デプロイ**: Cloudflare Workers
@@ -95,20 +95,11 @@ npm run dev
 | メソッド | パス | 説明 |
 |---------|------|------|
 | POST | /invoices | 請求書作成（draft） |
-| GET | /invoices | 一覧取得（?status=&limit=&last_key=） |
+| GET | /invoices | 一覧取得（?status=&limit=&last_key=&type=issued\|received） |
 | GET | /invoices/{id} | 詳細取得 |
 | PUT | /invoices/{id} | 更新（draftのみ） |
-| PATCH | /invoices/{id}/status | ステータス遷移（sent時に取引先DM通知） |
+| PATCH | /invoices/{id}/status | ステータス遷移（sent時に請求先DM通知） |
 | DELETE | /invoices/{id} | 削除（draftのみ） |
-
-### 取引先
-| メソッド | パス | 説明 |
-|---------|------|------|
-| POST | /clients | 取引先登録 |
-| GET | /clients | 一覧取得 |
-| GET | /clients/{id} | 詳細取得 |
-| PUT | /clients/{id} | 更新 |
-| DELETE | /clients/{id} | 削除 |
 
 ### Slack
 | メソッド | パス | 説明 |
@@ -120,18 +111,18 @@ npm run dev
 
 ## E2Eフロー
 
-1. 取引先登録（Web UI or API）- Slackユーザードロップダウンから選択可能
-2. 請求書作成（draft状態）
-3. A(発行者): draft → sent ステータス遷移（PDF生成SQS送信 + 取引先Slack DM通知「支払った」ボタン付き）
-4. PDF生成Lambda実行 → Slack DMで請求先クライアントへPDFファイル送信
-5. B(受取人): sent → paid（支払い報告）→ A宛にSlack DM「確認/差し戻し」ボタン付き
-6. A: paid → confirmed（支払い確認）→ B宛に確認完了DM / または paid → sent（差し戻し）→ B宛に差し戻しDM
-7. Web UIで一覧・詳細・PDF確認（ロールに応じたボタン表示）
+1. 請求書作成（draft状態）- 請求先はSlackユーザーIDで指定（`billing_slack_user_id`）
+2. A(発行者): draft → sent ステータス遷移（PDF生成SQS送信 + 請求先Slack DM通知「支払った」ボタン付き）
+3. PDF生成Lambda実行 → Slack DMで請求先ユーザーへPDFファイル送信
+4. B(受取人): sent → paid（支払い報告）→ A宛にSlack DM「確認/差し戻し」ボタン付き
+5. A: paid → confirmed（支払い確認）→ B宛に確認完了DM / または paid → sent（差し戻し）→ B宛に差し戻しDM
+6. Web UIで一覧・詳細・PDF確認（ロールに応じたボタン表示）
+7. 受領済み請求書は「受領済み」タブで確認可能
 8. リマインダーLambdaが期限間近の請求書をSlack通知
 
 ### Slackフロー（スラッシュコマンド）
 
-1. `/invoice-gen` → モーダル表示（取引先:任意、請求先担当者:任意）
+1. `/invoice-gen` → モーダル表示（請求先担当者:任意）
 2. 送信 → 請求書作成（draft） → 即sent遷移
 3. PDF生成（SQS送信）
 4. 発行者にDM: 「請求書を作成・送付しました」

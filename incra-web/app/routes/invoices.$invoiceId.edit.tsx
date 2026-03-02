@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Route } from "./+types/invoices.$invoiceId.edit";
 import { getSession } from "../lib/session";
 import { apiFetch } from "../lib/api";
+import { SlackUserSelect, type SlackUser } from "../components/slack-user-select";
 
 type InvoiceItem = {
   item_id?: string;
@@ -16,7 +17,7 @@ type InvoiceItem = {
 
 type Invoice = {
   invoice_id: string;
-  billing_client_id: string;
+  billing_slack_user_id?: string;
   billing_client_name?: string;
   total_amount: number;
   due_date: string;
@@ -24,11 +25,6 @@ type Invoice = {
   bank_details?: string;
   additional_info?: string;
   items?: InvoiceItem[];
-};
-
-type Client = {
-  client_id: string;
-  name: string;
 };
 
 type ItemRow = {
@@ -45,18 +41,28 @@ export async function loader({ request, context, params }: Route.LoaderArgs) {
   const session = await getSession(request, env.SESSION_SECRET);
   if (!session) throw redirect("/login");
 
-  const res = await apiFetch(env, session, `/invoices/${params.invoiceId}`);
-  if (!res.ok) throw redirect("/invoices");
-  const invoice: Invoice = await res.json();
+  const [invoiceRes, slackRes] = await Promise.all([
+    apiFetch(env, session, `/invoices/${params.invoiceId}`),
+    apiFetch(env, session, "/slack/users").catch(() => null),
+  ]);
+
+  if (!invoiceRes.ok) throw redirect("/invoices");
+  const invoice: Invoice = await invoiceRes.json();
 
   if (invoice.status !== "draft") {
     throw redirect(`/invoices/${params.invoiceId}`);
   }
 
-  const clientsRes = await apiFetch(env, session, "/clients");
-  const clients: Client[] = clientsRes.ok ? await clientsRes.json() : [];
+  let slackUsers: SlackUser[] = [];
+  try {
+    if (slackRes && slackRes.ok) {
+      slackUsers = await slackRes.json();
+    }
+  } catch {
+    // Don't block the page if Slack users fetch fails
+  }
 
-  return { invoice, clients, user: session };
+  return { invoice, slackUsers, user: session };
 }
 
 export async function action({ request, context, params }: Route.ActionArgs) {
@@ -81,7 +87,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   }
 
   const body = {
-    billing_client_id: formData.get("billing_client_id") as string,
+    billing_slack_user_id: formData.get("billing_slack_user_id") as string,
     billing_client_name: formData.get("billing_client_name") as string,
     due_date: formData.get("due_date") as string,
     bank_details: (formData.get("bank_details") as string) || undefined,
@@ -105,9 +111,14 @@ export async function action({ request, context, params }: Route.ActionArgs) {
 let nextKey = 1;
 
 export default function InvoiceEdit({ loaderData, actionData }: Route.ComponentProps) {
-  const { invoice, clients } = loaderData;
+  const { invoice, slackUsers } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+
+  const defaultUser = invoice.billing_slack_user_id
+    ? slackUsers.find((u) => u.id === invoice.billing_slack_user_id) ?? null
+    : null;
+  const [selectedUser, setSelectedUser] = useState<SlackUser | null>(defaultUser);
 
   const initialItems: ItemRow[] =
     invoice.items && invoice.items.length > 0
@@ -145,7 +156,6 @@ export default function InvoiceEdit({ loaderData, actionData }: Route.ComponentP
           <nav className="flex gap-4 items-center">
             <Link to="/" className="text-xl font-bold text-gray-800 dark:text-white">incra</Link>
             <Link to="/invoices" className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-semibold">請求書</Link>
-            <Link to="/clients" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">取引先</Link>
           </nav>
         </div>
       </header>
@@ -158,30 +168,18 @@ export default function InvoiceEdit({ loaderData, actionData }: Route.ComponentP
         )}
         <Form method="post" className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 space-y-6">
           <input type="hidden" name="item_count" value={items.length} />
+          <input type="hidden" name="billing_slack_user_id" value={selectedUser?.id ?? ""} />
+          <input type="hidden" name="billing_client_name" value={selectedUser?.real_name ?? ""} />
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="billing_client_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                取引先 <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                請求先 <span className="text-red-500">*</span>
               </label>
-              <input type="hidden" name="billing_client_name" id="billing_client_name" defaultValue={invoice.billing_client_name || ""} />
-              <select
-                id="billing_client_id"
-                name="billing_client_id"
-                required
-                defaultValue={invoice.billing_client_id}
-                className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onChange={(e) => {
-                  const nameInput = document.getElementById("billing_client_name") as HTMLInputElement;
-                  nameInput.value = e.target.selectedOptions[0]?.text || "";
-                }}
-              >
-                <option value="">選択してください</option>
-                {clients.map((c) => (
-                  <option key={c.client_id} value={c.client_id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <SlackUserSelect
+                users={slackUsers}
+                defaultUserId={invoice.billing_slack_user_id}
+                onSelect={setSelectedUser}
+              />
             </div>
             <div>
               <label htmlFor="due_date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

@@ -12,6 +12,7 @@ import (
 type InvoiceUseCase interface {
 	GetInvoice(invoiceId string) (domain.Invoice, error)
 	ListInvoices(issuerSlackUserId string, status string, limit int, lastKey string) ([]domain.Invoice, string, error)
+	ListReceivedInvoices(billingSlackUserId string, status string, limit int, lastKey string) ([]domain.Invoice, string, error)
 	CreateInvoice(invoice domain.Invoice) (domain.Invoice, error)
 	UpdateInvoice(invoice domain.Invoice) (domain.Invoice, error)
 	TransitionStatus(invoiceId string, status domain.InvoiceStatus, changedBy string, changedByUserId string) (domain.Invoice, error)
@@ -20,13 +21,11 @@ type InvoiceUseCase interface {
 
 type invoiceUseCase struct {
 	invoiceRepository repository.InvoiceRepository
-	clientRepository  repository.ClientRepository
 }
 
 func NewInvoiceUseCase() InvoiceUseCase {
 	return &invoiceUseCase{
 		invoiceRepository: infrastructure.NewInvoiceRepository(),
-		clientRepository:  infrastructure.NewClientRepository(),
 	}
 }
 
@@ -36,6 +35,10 @@ func (u *invoiceUseCase) GetInvoice(invoiceId string) (domain.Invoice, error) {
 
 func (u *invoiceUseCase) ListInvoices(issuerSlackUserId string, status string, limit int, lastKey string) ([]domain.Invoice, string, error) {
 	return u.invoiceRepository.ListInvoices(issuerSlackUserId, status, limit, lastKey)
+}
+
+func (u *invoiceUseCase) ListReceivedInvoices(billingSlackUserId string, status string, limit int, lastKey string) ([]domain.Invoice, string, error) {
+	return u.invoiceRepository.ListReceivedInvoices(billingSlackUserId, status, limit, lastKey)
 }
 
 func (u *invoiceUseCase) CreateInvoice(invoice domain.Invoice) (domain.Invoice, error) {
@@ -98,20 +101,12 @@ func (u *invoiceUseCase) TransitionStatus(invoiceId string, status domain.Invoic
 	case domain.InvoiceStatusSent:
 		if existing.Status == domain.InvoiceStatusDraft {
 			// Fresh send: PDF generation + notification with pay button
-			var billingClientSlackUserId string
-			if updated.BillingClientId != "" {
-				client, err := u.clientRepository.GetClient(updated.BillingClientId)
-				if err != nil {
-					fmt.Printf("warning: failed to get client for notification: %v\n", err)
-				} else {
-					billingClientSlackUserId = client.SlackUserId
-				}
-			}
-			if err := infrastructure.SendPDFGenerateMessage(updated, billingClientSlackUserId); err != nil {
+			billingSlackUserId := updated.BillingSlackUserId
+			if err := infrastructure.SendPDFGenerateMessage(updated, billingSlackUserId); err != nil {
 				fmt.Printf("warning: failed to send PDF generate message: %v\n", err)
 			}
-			if billingClientSlackUserId != "" {
-				if err := infrastructure.SendInvoiceNotificationWithPayButton(billingClientSlackUserId, updated); err != nil {
+			if billingSlackUserId != "" {
+				if err := infrastructure.SendInvoiceNotificationWithPayButton(billingSlackUserId, updated); err != nil {
 					fmt.Printf("warning: failed to send invoice notification DM: %v\n", err)
 				}
 			}
@@ -125,28 +120,18 @@ func (u *invoiceUseCase) TransitionStatus(invoiceId string, status domain.Invoic
 		}
 	case domain.InvoiceStatusConfirmed:
 		// Notify client that payment is confirmed
-		if updated.BillingClientId != "" {
-			client, err := u.clientRepository.GetClient(updated.BillingClientId)
-			if err != nil {
-				fmt.Printf("warning: failed to get client for notification: %v\n", err)
-			} else if client.SlackUserId != "" {
-				if err := infrastructure.SendPaymentConfirmedDM(client.SlackUserId, updated); err != nil {
-					fmt.Printf("warning: failed to send payment confirmed DM: %v\n", err)
-				}
+		if updated.BillingSlackUserId != "" {
+			if err := infrastructure.SendPaymentConfirmedDM(updated.BillingSlackUserId, updated); err != nil {
+				fmt.Printf("warning: failed to send payment confirmed DM: %v\n", err)
 			}
 		}
 	}
 
 	// Handle paid→sent rejection: notify client with pay button again
 	if existing.Status == domain.InvoiceStatusPaid && status == domain.InvoiceStatusSent {
-		if updated.BillingClientId != "" {
-			client, err := u.clientRepository.GetClient(updated.BillingClientId)
-			if err != nil {
-				fmt.Printf("warning: failed to get client for notification: %v\n", err)
-			} else if client.SlackUserId != "" {
-				if err := infrastructure.SendPaymentRejectedDM(client.SlackUserId, updated); err != nil {
-					fmt.Printf("warning: failed to send payment rejected DM: %v\n", err)
-				}
+		if updated.BillingSlackUserId != "" {
+			if err := infrastructure.SendPaymentRejectedDM(updated.BillingSlackUserId, updated); err != nil {
+				fmt.Printf("warning: failed to send payment rejected DM: %v\n", err)
 			}
 		}
 	}

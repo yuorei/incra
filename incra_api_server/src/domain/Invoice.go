@@ -33,6 +33,7 @@ type Invoice struct {
 	Status              InvoiceStatus  `json:"status" dynamodbav:"status"`
 	BillingClientId     string         `json:"billing_client_id" dynamodbav:"billing_client_id"`
 	BillingClientName   string         `json:"billing_client_name" dynamodbav:"billing_client_name"`
+	BillingSlackUserId  string         `json:"billing_slack_user_id,omitempty" dynamodbav:"billing_slack_user_id,omitempty"`
 	TotalAmount         int            `json:"total_amount" dynamodbav:"total_amount"`
 	DueDate             string         `json:"due_date" dynamodbav:"due_date"`
 	BankDetails         string         `json:"bank_details" dynamodbav:"bank_details"`

@@ -21,13 +21,11 @@ import (
 
 type ServerImpl struct {
 	invoiceUseCase usecase.InvoiceUseCase
-	clientUseCase  usecase.ClientUseCase
 }
 
 func NewServerImpl() *ServerImpl {
 	return &ServerImpl{
 		invoiceUseCase: usecase.NewInvoiceUseCase(),
-		clientUseCase:  usecase.NewClientUseCase(),
 	}
 }
 
@@ -63,9 +61,23 @@ func (s *ServerImpl) CreateInvoice(ctx echo.Context) error {
 		additionalInfo = *req.AdditionalInfo
 	}
 
+	billingClientId := ""
+	if req.BillingClientId != nil {
+		billingClientId = *req.BillingClientId
+	}
+	billingClientName := ""
+	if req.BillingClientName != nil {
+		billingClientName = *req.BillingClientName
+	}
+	billingSlackUserId := ""
+	if req.BillingSlackUserId != nil {
+		billingSlackUserId = *req.BillingSlackUserId
+	}
+
 	invoice := domain.Invoice{
-		BillingClientId:     req.BillingClientId,
-		BillingClientName:   req.BillingClientName,
+		BillingClientId:     billingClientId,
+		BillingClientName:   billingClientName,
+		BillingSlackUserId:  billingSlackUserId,
 		DueDate:             req.DueDate,
 		BankDetails:         req.BankDetails,
 		AdditionalInfo:      additionalInfo,
@@ -94,8 +106,17 @@ func (s *ServerImpl) ListInvoices(ctx echo.Context, params petstore.ListInvoices
 	if params.LastKey != nil {
 		lastKey = *params.LastKey
 	}
-	issuerSlackUserId := ctx.Request().Header.Get("X-Slack-User-Id")
-	invoices, nextKey, err := s.invoiceUseCase.ListInvoices(issuerSlackUserId, status, limit, lastKey)
+	slackUserId := ctx.Request().Header.Get("X-Slack-User-Id")
+
+	var invoices []domain.Invoice
+	var nextKey string
+	var err error
+
+	if params.Type != nil && *params.Type == "received" {
+		invoices, nextKey, err = s.invoiceUseCase.ListReceivedInvoices(slackUserId, status, limit, lastKey)
+	} else {
+		invoices, nextKey, err = s.invoiceUseCase.ListInvoices(slackUserId, status, limit, lastKey)
+	}
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
@@ -130,6 +151,9 @@ func (s *ServerImpl) UpdateInvoice(ctx echo.Context, invoiceId string) error {
 	}
 	if req.BillingClientName != nil {
 		invoice.BillingClientName = *req.BillingClientName
+	}
+	if req.BillingSlackUserId != nil {
+		invoice.BillingSlackUserId = *req.BillingSlackUserId
 	}
 	if req.DueDate != nil {
 		invoice.DueDate = *req.DueDate
@@ -191,100 +215,6 @@ func (s *ServerImpl) DeleteInvoice(ctx echo.Context, invoiceId string) error {
 	return ctx.NoContent(http.StatusNoContent)
 }
 
-func (s *ServerImpl) ListClients(ctx echo.Context) error {
-	clients, err := s.clientUseCase.ListClients("")
-	if err != nil {
-		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
-	}
-	resp := make([]petstore.ClientResponse, len(clients))
-	for i, c := range clients {
-		resp[i] = domainClientToAPI(c)
-	}
-	return ctx.JSON(http.StatusOK, resp)
-}
-
-func (s *ServerImpl) CreateClient(ctx echo.Context) error {
-	var req petstore.ClientRequest
-	if err := ctx.Bind(&req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
-	}
-	client := domain.Client{
-		Name: req.Name,
-	}
-	if req.SlackUserId != nil {
-		client.SlackUserId = *req.SlackUserId
-	}
-	if req.SlackRealName != nil {
-		client.SlackRealName = *req.SlackRealName
-	}
-	if req.Email != nil {
-		client.Email = *req.Email
-	}
-	if req.Phone != nil {
-		client.Phone = *req.Phone
-	}
-	if req.Address != nil {
-		client.Address = *req.Address
-	}
-	if req.BankDetails != nil {
-		client.BankDetails = *req.BankDetails
-	}
-	created, err := s.clientUseCase.CreateClient(client)
-	if err != nil {
-		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
-	}
-	return ctx.JSON(http.StatusCreated, domainClientToAPI(created))
-}
-
-func (s *ServerImpl) GetClient(ctx echo.Context, clientId string) error {
-	client, err := s.clientUseCase.GetClient(clientId)
-	if err != nil {
-		return ctx.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
-	}
-	return ctx.JSON(http.StatusOK, domainClientToAPI(client))
-}
-
-func (s *ServerImpl) UpdateClient(ctx echo.Context, clientId string) error {
-	var req petstore.ClientRequest
-	if err := ctx.Bind(&req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
-	}
-	client := domain.Client{
-		ClientId: clientId,
-		Name:     req.Name,
-	}
-	if req.SlackUserId != nil {
-		client.SlackUserId = *req.SlackUserId
-	}
-	if req.SlackRealName != nil {
-		client.SlackRealName = *req.SlackRealName
-	}
-	if req.Email != nil {
-		client.Email = *req.Email
-	}
-	if req.Phone != nil {
-		client.Phone = *req.Phone
-	}
-	if req.Address != nil {
-		client.Address = *req.Address
-	}
-	if req.BankDetails != nil {
-		client.BankDetails = *req.BankDetails
-	}
-	updated, err := s.clientUseCase.UpdateClient(client)
-	if err != nil {
-		return ctx.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
-	}
-	return ctx.JSON(http.StatusOK, domainClientToAPI(updated))
-}
-
-func (s *ServerImpl) DeleteClient(ctx echo.Context, clientId string) error {
-	if err := s.clientUseCase.DeleteClient(clientId); err != nil {
-		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
-	}
-	return ctx.NoContent(http.StatusNoContent)
-}
-
 func (s *ServerImpl) SlackEventsHandler(c echo.Context) error {
 	slackToken := os.Getenv("SLACK_TOKEN")
 	api := slack.New(slackToken)
@@ -339,35 +269,6 @@ func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-
-	clients, err := s.clientUseCase.ListClients("")
-	if err != nil {
-		fmt.Printf("failed to list clients: %v\n", err)
-		return c.JSON(http.StatusOK, map[string]string{"text": "取引先一覧の取得に失敗しました"})
-	}
-
-	clientOptions := make([]*slack.OptionBlockObject, len(clients))
-	for i, cl := range clients {
-		clientOptions[i] = slack.NewOptionBlockObject(
-			cl.ClientId,
-			slack.NewTextBlockObject(slack.PlainTextType, cl.Name, false, false),
-			nil,
-		)
-	}
-
-	clientSelectElement := slack.NewOptionsSelectBlockElement(
-		slack.OptTypeStatic,
-		slack.NewTextBlockObject(slack.PlainTextType, "取引先を選択", false, false),
-		"client_select",
-		clientOptions...,
-	)
-	clientSelect := slack.NewInputBlock(
-		"client_block",
-		slack.NewTextBlockObject(slack.PlainTextType, "取引先", false, false),
-		nil,
-		clientSelectElement,
-	)
-	clientSelect.Optional = true
 
 	billingUserElement := &slack.SelectBlockElement{
 		Type:        "users_select",
@@ -447,7 +348,6 @@ func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
 		Close:  slack.NewTextBlockObject(slack.PlainTextType, "キャンセル", false, false),
 		Blocks: slack.Blocks{
 			BlockSet: []slack.Block{
-				clientSelect,
 				billingUserSelect,
 				dueDatePicker,
 				bankDetailsInput,
@@ -496,14 +396,6 @@ func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.Inte
 
 	values := interaction.View.State.Values
 
-	// 取引先（任意）
-	var billingClientId, billingClientName string
-	clientOption := values["client_block"]["client_select"].SelectedOption
-	if clientOption.Value != "" {
-		billingClientId = clientOption.Value
-		billingClientName = clientOption.Text.Text
-	}
-
 	// 請求先担当者（任意）
 	billingUser := values["billing_user_block"]["billing_user_action"].SelectedUser
 
@@ -544,8 +436,8 @@ func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.Inte
 	issuerSlackRealName := interaction.User.Name
 
 	invoice := domain.Invoice{
-		BillingClientId:     billingClientId,
-		BillingClientName:   billingClientName,
+		BillingSlackUserId:  billingUser,
+		BillingClientName:   "",
 		DueDate:             dueDate,
 		BankDetails:         bankDetails,
 		AdditionalInfo:      additionalInfo,
@@ -728,6 +620,7 @@ func domainInvoiceToAPI(inv domain.Invoice) petstore.Invoice {
 		Status:              &status,
 		BillingClientId:     &inv.BillingClientId,
 		BillingClientName:   &inv.BillingClientName,
+		BillingSlackUserId:  &inv.BillingSlackUserId,
 		TotalAmount:         &totalAmount,
 		DueDate:             &inv.DueDate,
 		BankDetails:         &inv.BankDetails,
@@ -754,22 +647,6 @@ func domainInvoiceToAPI(inv domain.Invoice) petstore.Invoice {
 		result.PaidMethod = &inv.PaidMethod
 	}
 	return result
-}
-
-func domainClientToAPI(c domain.Client) petstore.ClientResponse {
-	return petstore.ClientResponse{
-		ClientId:      &c.ClientId,
-		Name:          &c.Name,
-		SlackUserId:   &c.SlackUserId,
-		SlackRealName: &c.SlackRealName,
-		Email:         &c.Email,
-		Phone:         &c.Phone,
-		Address:       &c.Address,
-		BankDetails:   &c.BankDetails,
-		RegisteredBy:  &c.RegisteredBy,
-		CreatedAt:     &c.CreatedAt,
-		UpdatedAt:     &c.UpdatedAt,
-	}
 }
 
 func formatAmount(amount int) string {

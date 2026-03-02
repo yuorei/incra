@@ -7,21 +7,22 @@
 請求書管理システム（incra）で、以下のコンポーネントで構成:
 
 1. **incra_api_server/** - Go APIサーバー（Lambda）、クリーンアーキテクチャ
-   - `src/domain/` - ドメインモデル（Invoice, Client）とリポジトリインターフェース
-   - `src/usecase/` - ユースケース層（InvoiceUseCase, ClientUseCase）
+   - `src/domain/` - ドメインモデル（Invoice）とリポジトリインターフェース
+   - `src/usecase/` - ユースケース層（InvoiceUseCase）
    - `src/ui/` - HTTPハンドラー（Echo framework）、Slackハンドラー、認証ミドルウェア
    - `src/infrastructure/` - DynamoDB, SQS, Slack DM通知実装
    - `api/v1/generated.go` - `petstore.yaml`から自動生成（直接編集禁止）
    - `cmd/reminder/` - リマインダーLambda（毎日Slack通知）
    - Slack連携: ユーザー一覧API（`GET /slack/users`）、Block Kitボタン付きDM通知、モーダルで即sent遷移、ボタンアクション処理（支払い報告・確認・差し戻し）
    - 二段階支払い確認フロー: draft→sent→paid→confirmed（権限ベースのステータス遷移バリデーション）
+   - 請求先はSlackユーザーIDベースで管理（`billing_slack_user_id`フィールド）
+   - 発行済み・受領済み請求書の一覧取得対応（`type=issued|received`クエリパラメータ）
 
 2. **pdf_generate/** - Python PDF生成Lambda
-   - SQSからインボイスデータ受信 → PDF生成 → Slack DMで請求先クライアントへPDFファイル送信
+   - SQSからインボイスデータ受信 → PDF生成 → Slack DMで請求先ユーザーへPDFファイル送信
 
 3. **incra-web/** - React Router v7フロントエンド（Cloudflare Workers）
-   - `app/routes/invoices.*` - 請求書管理ページ群
-   - `app/routes/clients.*` - 取引先管理ページ群
+   - `app/routes/invoices.*` - 請求書管理ページ群（発行済み・受領済みタブ切替）
    - `app/lib/api.ts` - 認証ヘッダー付きAPIフェッチヘルパー
 
 4. **infra/** - Terraform構成（モジュール化・環境分離）
@@ -47,8 +48,7 @@ cd infra/global/oidc && terraform init && terraform plan
 
 ## DynamoDBテーブル
 
-- `incra-invoices` (PK: invoice_id, GSI: issuer_slack_user_id-created_at-index)
-- `incra-clients` (PK: client_id, GSI: slack_user_id-index)
+- `incra-invoices` (PK: invoice_id, GSI: issuer_slack_user_id-created_at-index, GSI: billing_slack_user_id-created_at-index)
 - `incra-counter` (PK: counter_name, アトミック採番 INV-YYYY-NNNN)
 
 ## CI/CD

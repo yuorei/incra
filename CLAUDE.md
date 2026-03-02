@@ -15,13 +15,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. **incra_api_server/** - Go製のAPIサーバー（Lambda関数として動作）
    - クリーンアーキテクチャに基づく構造:
-     - `src/domain/` - ビジネスロジック（Invoice, Client）とリポジトリインターフェース
-     - `src/usecase/` - ユースケース層（InvoiceUseCase, ClientUseCase）
+     - `src/domain/` - ビジネスロジック（Invoice）とリポジトリインターフェース
+     - `src/usecase/` - ユースケース層（InvoiceUseCase）
      - `src/ui/` - HTTPハンドラー（Echo framework）、Slackハンドラー、認証ミドルウェア
      - `src/infrastructure/` - 外部サービス統合（DynamoDB, SQS, Slack DM通知・Block Kitボタン付きDM）
    - `api/v1/generated.go` - OpenAPI仕様（`petstore.yaml`）から自動生成
    - AWS Lambda上でEcho serverを実行（aws-lambda-go-api-proxy使用）
-   - DynamoDB: `incra-invoices`, `incra-clients`, `incra-counter` テーブル使用
+   - DynamoDB: `incra-invoices`, `incra-counter` テーブル使用
+   - 請求書はSlackユーザーIDベースで管理（`billing_slack_user_id`フィールド）
 
 2. **incra_api_server/cmd/reminder/** - Go製のリマインダーLambda関数
    - EventBridge Schedulerから毎日9:00 JSTに起動
@@ -31,13 +32,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - `src/handler.py` がLambdaエントリーポイント
    - SQSからフルインボイスデータを受信してPDF生成
    - `src/invoice_generator.py` で実際のPDF生成処理
-   - 生成したPDFをSlack DMで請求先クライアントへファイル送信（slack_sdk使用）
+   - 生成したPDFをSlack DMで請求先ユーザーへファイル送信（slack_sdk使用）
 
 4. **incra-web/** - React Router製のフロントエンドアプリケーション（Cloudflare Workersで動作）
    - React Router v7を使用したSSR対応のWebアプリケーション
    - `app/routes/` - ファイルシステムベースルーティング
-     - 請求書管理: `invoices._index`, `invoices.new`, `invoices.$invoiceId`, `invoices.$invoiceId.edit`
-     - 取引先管理: `clients._index`, `clients.new`, `clients.$clientId`
+     - 請求書管理: `invoices._index`（発行済み・受領済みタブ切替）, `invoices.new`, `invoices.$invoiceId`, `invoices.$invoiceId.edit`
    - `app/lib/api.ts` - APIフェッチヘルパー（X-Slack-User-Idヘッダー付与）
    - `workers/app.ts` - Cloudflare Workers エントリーポイント
    - TailwindCSS v4でスタイリング
@@ -52,20 +52,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 請求書（Invoices）
 - `POST /invoices` - 請求書作成（draft状態）
-- `GET /invoices` - 一覧取得（?status=&limit=&last_key=）
+- `GET /invoices` - 一覧取得（?status=&limit=&last_key=&type=issued|received）
 - `GET /invoices/{invoice_id}` - 詳細取得
 - `PUT /invoices/{invoice_id}` - 更新（draftのみ）
 - `PATCH /invoices/{invoice_id}/status` - ステータス遷移
 - `DELETE /invoices/{invoice_id}` - 削除（draftのみ）
 
-ステータス遷移: draft→sent（PDF生成SQS送信 + 取引先Slack DM「支払った」ボタン付き通知）、sent→paid（受取人のみ、発行者宛に確認/差し戻しボタン付きDM）、paid→confirmed（発行者のみ、受取人宛に確認完了DM）、paid→sent（発行者のみ、差し戻し・受取人宛に再通知DM）、sent→cancelled、draft→cancelled
+`type`パラメータ: `issued`（デフォルト）= 自分が発行した請求書、`received` = 自分宛に届いた請求書（`billing_slack_user_id`で検索）
 
-### 取引先（Clients）
-- `POST /clients` - 取引先登録
-- `GET /clients` - 一覧取得
-- `GET /clients/{client_id}` - 詳細取得
-- `PUT /clients/{client_id}` - 更新
-- `DELETE /clients/{client_id}` - 削除
+ステータス遷移: draft→sent（PDF生成SQS送信 + 請求先Slack DM「支払った」ボタン付き通知）、sent→paid（受取人のみ、発行者宛に確認/差し戻しボタン付きDM）、paid→confirmed（発行者のみ、受取人宛に確認完了DM）、paid→sent（発行者のみ、差し戻し・受取人宛に再通知DM）、sent→cancelled、draft→cancelled
 
 ### Slack
 - `POST /slack/events` - Slackイベント受信
@@ -153,8 +148,7 @@ terraform plan
 
 ## DynamoDB Tables
 
-- **incra-invoices** - 請求書テーブル（PK: invoice_id, GSI: issuer_slack_user_id-created_at-index）
-- **incra-clients** - 取引先テーブル（PK: client_id, GSI: slack_user_id-index）
+- **incra-invoices** - 請求書テーブル（PK: invoice_id, GSI: issuer_slack_user_id-created_at-index, GSI: billing_slack_user_id-created_at-index）
 - **incra-counter** - 採番テーブル（PK: counter_name, アトミックインクリメントでINV-YYYY-NNNNフォーマット）
 
 ## Code Generation & Generated Files
@@ -179,7 +173,7 @@ terraform plan
 
 ## Secrets Management
 
-- 環境変数: `SLACK_TOKEN`, `QUEUE_URL`, `INVOICE_TABLE_NAME`, `CLIENT_TABLE_NAME`, `COUNTER_TABLE_NAME`, `WEB_BASE_URL`など
+- 環境変数: `SLACK_TOKEN`, `QUEUE_URL`, `INVOICE_TABLE_NAME`, `COUNTER_TABLE_NAME`, `WEB_BASE_URL`など
 - AWS Systems Manager Parameter Storeまたは Secrets Manager を使用
 - `.env`ファイルをコミットしない
 - GitHub Actionsでは OIDC経由でAWS認証（IAM roleをassume）

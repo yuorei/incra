@@ -77,6 +77,35 @@ func (r *DynamoDBInvoiceRepository) ListInvoices(issuerSlackUserId string, statu
 	return invoices, "", nil
 }
 
+func (r *DynamoDBInvoiceRepository) ListReceivedInvoices(billingSlackUserId string, status string, limit int, lastKey string) ([]domain.Invoice, string, error) {
+	input := &dynamodb.QueryInput{
+		TableName:              aws.String(r.tableName),
+		IndexName:              aws.String("billing_slack_user_id-created_at-index"),
+		KeyConditionExpression: aws.String("billing_slack_user_id = :uid"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":uid": &types.AttributeValueMemberS{Value: billingSlackUserId},
+		},
+		ScanIndexForward: aws.Bool(false),
+	}
+	if limit > 0 {
+		input.Limit = aws.Int32(int32(limit))
+	}
+	if status != "" {
+		input.FilterExpression = aws.String("#s = :status")
+		input.ExpressionAttributeNames = map[string]string{"#s": "status"}
+		input.ExpressionAttributeValues[":status"] = &types.AttributeValueMemberS{Value: status}
+	}
+	out, err := r.client.Query(context.TODO(), input)
+	if err != nil {
+		return nil, "", err
+	}
+	var invoices []domain.Invoice
+	if err := attributevalue.UnmarshalListOfMaps(out.Items, &invoices); err != nil {
+		return nil, "", err
+	}
+	return invoices, "", nil
+}
+
 func (r *DynamoDBInvoiceRepository) CreateInvoice(invoice domain.Invoice) (domain.Invoice, error) {
 	item, err := attributevalue.MarshalMap(invoice)
 	if err != nil {

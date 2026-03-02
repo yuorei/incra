@@ -12,12 +12,6 @@ variable "invoice_table_name" {
   default     = "incra-invoices"
 }
 
-variable "client_table_name" {
-  description = "DynamoDB table name for clients"
-  type        = string
-  default     = "incra-clients"
-}
-
 variable "counter_table_name" {
   description = "DynamoDB table name for counter"
   type        = string

@@ -21,7 +21,8 @@ type HistoryEntry = {
 
 type Invoice = {
   invoice_id: string;
-  billing_client_id: string;
+  billing_client_id?: string;
+  billing_slack_user_id?: string;
   billing_client_name?: string;
   issuer_slack_user_id: string;
   total_amount: number;
@@ -105,7 +106,6 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
           <nav className="flex gap-4 items-center">
             <Link to="/" className="text-xl font-bold text-gray-800 dark:text-white">incra</Link>
             <Link to="/invoices" className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-semibold">請求書</Link>
-            <Link to="/clients" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">取引先</Link>
           </nav>
         </div>
       </header>
@@ -145,8 +145,8 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
               </p>
             </div>
             <div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">取引先</span>
-              <p className="text-sm text-gray-900 dark:text-gray-100">{invoice.billing_client_name || invoice.billing_client_id}</p>
+              <span className="text-xs text-gray-500 dark:text-gray-400">請求先</span>
+              <p className="text-sm text-gray-900 dark:text-gray-100">{invoice.billing_client_name || invoice.billing_slack_user_id || invoice.billing_client_id || "-"}</p>
             </div>
             <div>
               <span className="text-xs text-gray-500 dark:text-gray-400">支払期限</span>

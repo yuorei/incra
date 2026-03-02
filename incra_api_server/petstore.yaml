@@ -15,8 +15,6 @@ tags:
     description: "ヘルスチェック"
   - name: "invoices"
     description: "請求書管理API"
-  - name: "clients"
-    description: "取引先管理API"
 
 paths:
   /health:
@@ -73,6 +71,12 @@ paths:
           required: false
           schema:
             type: string
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [issued, received]
       responses:
         '200':
           description: Successful operation
@@ -175,101 +179,6 @@ paths:
         '404':
           description: Invoice not found
 
-  /clients:
-    post:
-      tags: ["clients"]
-      summary: 取引先を登録
-      operationId: createClient
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ClientRequest'
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClientResponse'
-        '400':
-          description: Invalid input
-    get:
-      tags: ["clients"]
-      summary: 取引先一覧を取得
-      operationId: listClients
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ClientResponse'
-
-  /clients/{client_id}:
-    get:
-      tags: ["clients"]
-      summary: 取引先を取得
-      operationId: getClient
-      parameters:
-        - name: client_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClientResponse'
-        '404':
-          description: Client not found
-    put:
-      tags: ["clients"]
-      summary: 取引先を更新
-      operationId: updateClient
-      parameters:
-        - name: client_id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ClientRequest'
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClientResponse'
-        '404':
-          description: Client not found
-    delete:
-      tags: ["clients"]
-      summary: 取引先を削除
-      operationId: deleteClient
-      parameters:
-        - name: client_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '204':
-          description: Deleted
-        '404':
-          description: Client not found
-
 components:
   schemas:
     Health:
@@ -325,8 +234,6 @@ components:
     CreateInvoiceRequest:
       type: object
       required:
-        - billing_client_id
-        - billing_client_name
         - due_date
         - bank_details
         - items
@@ -337,6 +244,9 @@ components:
         billing_client_name:
           type: string
           description: "請求先名"
+        billing_slack_user_id:
+          type: string
+          description: "請求先SlackユーザーID"
         due_date:
           type: string
           description: "支払期限"
@@ -357,6 +267,8 @@ components:
         billing_client_id:
           type: string
         billing_client_name:
+          type: string
+        billing_slack_user_id:
           type: string
         due_date:
           type: string
@@ -390,6 +302,8 @@ components:
         billing_client_id:
           type: string
         billing_client_name:
+          type: string
+        billing_slack_user_id:
           type: string
         total_amount:
           type: integer
@@ -432,57 +346,4 @@ components:
           items:
             $ref: '#/components/schemas/Invoice'
         next_key:
-          type: string
-
-    ClientRequest:
-      type: object
-      required:
-        - name
-      properties:
-        name:
-          type: string
-          description: "取引先名"
-        slack_user_id:
-          type: string
-          description: "SlackユーザーID"
-        slack_real_name:
-          type: string
-          description: "Slack本名"
-        email:
-          type: string
-          description: "メールアドレス"
-        phone:
-          type: string
-          description: "電話番号"
-        address:
-          type: string
-          description: "住所"
-        bank_details:
-          type: string
-          description: "振込先情報"
-
-    ClientResponse:
-      type: object
-      properties:
-        client_id:
-          type: string
-        name:
-          type: string
-        slack_user_id:
-          type: string
-        slack_real_name:
-          type: string
-        email:
-          type: string
-        phone:
-          type: string
-        address:
-          type: string
-        bank_details:
-          type: string
-        registered_by:
-          type: string
-        created_at:
-          type: string
-        updated_at:
           type: string

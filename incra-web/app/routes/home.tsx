@@ -69,9 +69,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300">請求書管理</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">請求書の作成・管理</p>
           </Link>
-          <Link to="/clients" className="block bg-white dark:bg-gray-800 shadow rounded-lg p-6 hover:shadow-md dark:hover:bg-gray-700 transition">
-            <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300">取引先管理</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">取引先の登録・管理</p>
+          <Link to="/invoices?type=received" className="block bg-white dark:bg-gray-800 shadow rounded-lg p-6 hover:shadow-md dark:hover:bg-gray-700 transition">
+            <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300">受け取った請求書</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">自分宛の請求書を確認</p>
           </Link>
         </div>
       </main>
