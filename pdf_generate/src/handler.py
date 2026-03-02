@@ -61,13 +61,16 @@ def lambda_handler(event, context):
             # Slack DMでPDFファイルを送信
             if billing_client_slack_user_id:
                 try:
-                    dm = slack_client.conversations_open(users=[billing_client_slack_user_id])
-                    dm_channel_id = dm['channel']['id']
-                    slack_client.files_upload_v2(
-                        channel=dm_channel_id,
+                    # ファイルをアップロード（チャンネル指定なし）
+                    upload_result = slack_client.files_upload_v2(
                         file=file_path,
                         title=f"請求書 {invoice_id}",
-                        initial_comment=f"請求書 {invoice_id} のPDFです。",
+                    )
+                    file_url = upload_result['file']['permalink']
+                    # chat:writeスコープでDM送信
+                    slack_client.chat_postMessage(
+                        channel=billing_client_slack_user_id,
+                        text=f"請求書 {invoice_id} のPDFです。\n{file_url}",
                     )
                     logger.info(f"PDF sent via Slack DM to {billing_client_slack_user_id} for invoice: {invoice_id}")
                 except SlackApiError as e:

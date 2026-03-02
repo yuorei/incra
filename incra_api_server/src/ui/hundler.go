@@ -69,15 +69,14 @@ func (s *ServerImpl) CreateInvoice(ctx echo.Context) error {
 	if req.BillingClientName != nil {
 		billingClientName = *req.BillingClientName
 	}
-	billingSlackUserId := ""
-	if req.BillingSlackUserId != nil {
-		billingSlackUserId = *req.BillingSlackUserId
+	if req.BillingSlackUserId == "" {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "billing_slack_user_id is required"})
 	}
 
 	invoice := domain.Invoice{
 		BillingClientId:     billingClientId,
 		BillingClientName:   billingClientName,
-		BillingSlackUserId:  billingSlackUserId,
+		BillingSlackUserId:  req.BillingSlackUserId,
 		DueDate:             req.DueDate,
 		BankDetails:         req.BankDetails,
 		AdditionalInfo:      additionalInfo,
@@ -281,7 +280,7 @@ func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
 		nil,
 		billingUserElement,
 	)
-	billingUserSelect.Optional = true
+	billingUserSelect.Optional = false
 
 	dueDatePicker := slack.NewInputBlock(
 		"due_date_block",
@@ -396,7 +395,7 @@ func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.Inte
 
 	values := interaction.View.State.Values
 
-	// 請求先担当者（任意）
+	// 請求先
 	billingUser := values["billing_user_block"]["billing_user_action"].SelectedUser
 
 	// 支払期限

@@ -234,6 +234,7 @@ components:
     CreateInvoiceRequest:
       type: object
       required:
+        - billing_slack_user_id
         - due_date
         - bank_details
         - items

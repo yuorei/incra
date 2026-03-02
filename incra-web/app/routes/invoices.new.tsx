@@ -53,8 +53,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     });
   }
 
+  const billingSlackUserId = formData.get("billing_slack_user_id") as string;
+  if (!billingSlackUserId) {
+    return { error: "請求先を選択してください" };
+  }
+
   const body = {
-    billing_slack_user_id: formData.get("billing_slack_user_id") as string,
+    billing_slack_user_id: billingSlackUserId,
     billing_client_name: formData.get("billing_client_name") as string,
     due_date: formData.get("due_date") as string,
     bank_details: (formData.get("bank_details") as string) || "",
