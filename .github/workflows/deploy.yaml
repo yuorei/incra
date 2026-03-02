@@ -61,7 +61,8 @@ jobs:
           pip install --platform manylinux2014_x86_64 --only-binary=:all: --implementation cp --target pdf_generate/src -r pdf_generate/src/requirements.txt
 
       - name: Zip Python Lambda
-        run: zip -r python_lambda.zip pdf_generate/src
+        working-directory: pdf_generate/src
+        run: zip -r ../../python_lambda.zip .
 
       # --- Lambda zip を配置 ---
       - name: Create lambda output directory
