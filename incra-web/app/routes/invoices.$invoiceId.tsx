@@ -23,6 +23,7 @@ type Invoice = {
   invoice_id: string;
   billing_client_id: string;
   billing_client_name?: string;
+  issuer_slack_user_id: string;
   total_amount: number;
   due_date: string;
   status: string;
@@ -38,6 +39,7 @@ const STATUS_LABELS: Record<string, string> = {
   draft: "下書き",
   sent: "送信済み",
   paid: "支払い済み",
+  confirmed: "確認済み",
   cancelled: "キャンセル",
 };
 
@@ -45,6 +47,7 @@ const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300",
   sent: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
   paid: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+  confirmed: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
   cancelled: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
 };
 
@@ -90,9 +93,10 @@ export async function action({ request, context, params }: Route.ActionArgs) {
 }
 
 export default function InvoiceDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { invoice } = loaderData;
+  const { invoice, user } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+  const isIssuer = user.id === invoice.issuer_slack_user_id;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -179,7 +183,7 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
           )}
 
           <div className="flex gap-2 pt-4 border-t dark:border-gray-700">
-            {invoice.status === "draft" && (
+            {invoice.status === "draft" && isIssuer && (
               <>
                 <Form method="post">
                   <input type="hidden" name="intent" value="transition" />
@@ -208,31 +212,60 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
                 </Form>
               </>
             )}
-            {invoice.status === "sent" && (
+            {invoice.status === "sent" && !isIssuer && (
+              <Form method="post">
+                <input type="hidden" name="intent" value="transition" />
+                <input type="hidden" name="new_status" value="paid" />
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 disabled:opacity-50"
+                >
+                  支払った
+                </button>
+              </Form>
+            )}
+            {invoice.status === "sent" && isIssuer && (
+              <Form method="post">
+                <input type="hidden" name="intent" value="transition" />
+                <input type="hidden" name="new_status" value="cancelled" />
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="border border-red-300 dark:border-red-600 text-red-600 dark:text-red-400 px-4 py-2 rounded text-sm hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-50"
+                  onClick={(e) => {
+                    if (!confirm("キャンセルしますか？")) e.preventDefault();
+                  }}
+                >
+                  キャンセル
+                </button>
+              </Form>
+            )}
+            {invoice.status === "paid" && isIssuer && (
               <>
                 <Form method="post">
                   <input type="hidden" name="intent" value="transition" />
-                  <input type="hidden" name="new_status" value="paid" />
+                  <input type="hidden" name="new_status" value="confirmed" />
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 disabled:opacity-50"
+                    className="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:opacity-50"
                   >
-                    支払い完了
+                    確認
                   </button>
                 </Form>
                 <Form method="post">
                   <input type="hidden" name="intent" value="transition" />
-                  <input type="hidden" name="new_status" value="cancelled" />
+                  <input type="hidden" name="new_status" value="sent" />
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="border border-red-300 dark:border-red-600 text-red-600 dark:text-red-400 px-4 py-2 rounded text-sm hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-50"
+                    className="border border-orange-300 dark:border-orange-600 text-orange-600 dark:text-orange-400 px-4 py-2 rounded text-sm hover:bg-orange-50 dark:hover:bg-orange-900/30 disabled:opacity-50"
                     onClick={(e) => {
-                      if (!confirm("キャンセルしますか？")) e.preventDefault();
+                      if (!confirm("差し戻しますか？")) e.preventDefault();
                     }}
                   >
-                    キャンセル
+                    差し戻し
                   </button>
                 </Form>
               </>

@@ -1,24 +1,10 @@
 import json
 import logging
 import os
-import boto3
-import r2
 import invoice_generator
-from datetime import datetime, timezone
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 
-def update_invoice_pdf_url(invoice_id: str, pdf_url: str):
-    """DynamoDBのpdf_urlフィールドを更新する"""
-    dynamodb = boto3.resource('dynamodb', region_name=os.environ.get('AWS_REGION', 'ap-northeast-1'))
-    table_name = os.environ.get('INVOICE_TABLE_NAME', 'incra-invoices')
-    table = dynamodb.Table(table_name)
-    table.update_item(
-        Key={'invoice_id': invoice_id},
-        UpdateExpression='SET pdf_url = :url, updated_at = :now',
-        ExpressionAttributeValues={
-            ':url': pdf_url,
-            ':now': datetime.now(timezone.utc).isoformat()
-        }
-    )
 
 def lambda_handler(event, context):
     logging.basicConfig(level=logging.INFO)
@@ -27,9 +13,13 @@ def lambda_handler(event, context):
     logger.info("Processing PDF generation request...")
     logger.info(f"Event: {json.dumps(event)}")
 
+    slack_client = WebClient(token=os.environ.get('SLACK_TOKEN'))
+
     for record in event.get('Records', []):
         try:
-            invoice_data = json.loads(record['body'])
+            message = json.loads(record['body'])
+            invoice_data = {k: v for k, v in message.items() if k != 'billing_client_slack_user_id'}
+            billing_client_slack_user_id = message.get('billing_client_slack_user_id', '')
             logger.info(f"Processing invoice: {invoice_data.get('invoice_id')}")
 
             invoice_id = invoice_data.get('invoice_id', 'unknown')
@@ -68,16 +58,25 @@ def lambda_handler(event, context):
                 output_file=file_path
             )
 
-            # Cloudflare R2 にアップロード
-            upload_url = r2.upload_to_cloudflare(file_path)
-
-            if upload_url:
-                logger.info(f"PDF uploaded successfully: {upload_url}")
-                # DynamoDBのpdf_urlを更新
-                update_invoice_pdf_url(invoice_id, upload_url)
-                logger.info(f"Updated DynamoDB pdf_url for invoice: {invoice_id}")
+            # Slack DMでPDFファイルを送信
+            if billing_client_slack_user_id:
+                try:
+                    slack_client.files_upload_v2(
+                        channel=billing_client_slack_user_id,
+                        file=file_path,
+                        title=f"請求書 {invoice_id}",
+                        initial_comment=f"請求書 {invoice_id} のPDFです。",
+                    )
+                    logger.info(f"PDF sent via Slack DM to {billing_client_slack_user_id} for invoice: {invoice_id}")
+                except SlackApiError as e:
+                    logger.error(f"Failed to send PDF via Slack DM: {e}")
+                    raise
             else:
-                logger.error(f"Failed to upload PDF for invoice: {invoice_id}")
+                logger.warning(f"No billing client Slack user ID for invoice: {invoice_id}, skipping Slack DM")
+
+            # ローカルファイルのクリーンアップ
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
         except Exception as e:
             logger.error(f"Error processing record: {e}")

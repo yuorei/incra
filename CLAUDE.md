@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
      - `src/domain/` - ビジネスロジック（Invoice, Client）とリポジトリインターフェース
      - `src/usecase/` - ユースケース層（InvoiceUseCase, ClientUseCase）
      - `src/ui/` - HTTPハンドラー（Echo framework）、Slackハンドラー、認証ミドルウェア
-     - `src/infrastructure/` - 外部サービス統合（DynamoDB, SQS, Slack DM通知）
+     - `src/infrastructure/` - 外部サービス統合（DynamoDB, SQS, Slack DM通知・Block Kitボタン付きDM）
    - `api/v1/generated.go` - OpenAPI仕様（`petstore.yaml`）から自動生成
    - AWS Lambda上でEcho serverを実行（aws-lambda-go-api-proxy使用）
    - DynamoDB: `incra-invoices`, `incra-clients`, `incra-counter` テーブル使用
@@ -31,7 +31,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - `src/handler.py` がLambdaエントリーポイント
    - SQSからフルインボイスデータを受信してPDF生成
    - `src/invoice_generator.py` で実際のPDF生成処理
-   - R2（Cloudflare Object Storage）へのアップロード後、DynamoDBのpdf_urlを更新
+   - 生成したPDFをSlack DMで請求先クライアントへファイル送信（slack_sdk使用）
 
 4. **incra-web/** - React Router製のフロントエンドアプリケーション（Cloudflare Workersで動作）
    - React Router v7を使用したSSR対応のWebアプリケーション
@@ -58,7 +58,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `PATCH /invoices/{invoice_id}/status` - ステータス遷移
 - `DELETE /invoices/{invoice_id}` - 削除（draftのみ）
 
-ステータス遷移: draft→sent（PDF生成SQS送信 + 取引先Slack DM通知）、sent→paid/cancelled、draft→cancelled
+ステータス遷移: draft→sent（PDF生成SQS送信 + 取引先Slack DM「支払った」ボタン付き通知）、sent→paid（受取人のみ、発行者宛に確認/差し戻しボタン付きDM）、paid→confirmed（発行者のみ、受取人宛に確認完了DM）、paid→sent（発行者のみ、差し戻し・受取人宛に再通知DM）、sent→cancelled、draft→cancelled
 
 ### 取引先（Clients）
 - `POST /clients` - 取引先登録
@@ -70,7 +70,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Slack
 - `POST /slack/events` - Slackイベント受信
 - `POST /slack/slashs` - Slackスラッシュコマンド（請求書作成モーダル → 即sent遷移）
-- `POST /slack/interactions` - Slackモーダル送信処理
+- `POST /slack/interactions` - Slackモーダル送信・ボタンアクション処理（支払い報告、確認、差し戻し）
 - `GET /slack/users` - Slackワークスペースユーザー一覧取得
 
 ## Development Commands

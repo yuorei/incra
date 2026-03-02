@@ -13,10 +13,11 @@
    - `src/infrastructure/` - DynamoDB, SQS, Slack DM通知実装
    - `api/v1/generated.go` - `petstore.yaml`から自動生成（直接編集禁止）
    - `cmd/reminder/` - リマインダーLambda（毎日Slack通知）
-   - Slack連携: ユーザー一覧API（`GET /slack/users`）、sent時DM通知、モーダルで即sent遷移
+   - Slack連携: ユーザー一覧API（`GET /slack/users`）、Block Kitボタン付きDM通知、モーダルで即sent遷移、ボタンアクション処理（支払い報告・確認・差し戻し）
+   - 二段階支払い確認フロー: draft→sent→paid→confirmed（権限ベースのステータス遷移バリデーション）
 
 2. **pdf_generate/** - Python PDF生成Lambda
-   - SQSからインボイスデータ受信 → PDF生成 → R2アップロード → DynamoDB更新
+   - SQSからインボイスデータ受信 → PDF生成 → Slack DMで請求先クライアントへPDFファイル送信
 
 3. **incra-web/** - React Router v7フロントエンド（Cloudflare Workers）
    - `app/routes/invoices.*` - 請求書管理ページ群

@@ -14,7 +14,7 @@ type InvoiceUseCase interface {
 	ListInvoices(issuerSlackUserId string, status string, limit int, lastKey string) ([]domain.Invoice, string, error)
 	CreateInvoice(invoice domain.Invoice) (domain.Invoice, error)
 	UpdateInvoice(invoice domain.Invoice) (domain.Invoice, error)
-	TransitionStatus(invoiceId string, status domain.InvoiceStatus, changedBy string) (domain.Invoice, error)
+	TransitionStatus(invoiceId string, status domain.InvoiceStatus, changedBy string, changedByUserId string) (domain.Invoice, error)
 	DeleteInvoice(invoiceId string) error
 }
 
@@ -77,7 +77,7 @@ func (u *invoiceUseCase) UpdateInvoice(invoice domain.Invoice) (domain.Invoice, 
 	return u.invoiceRepository.UpdateInvoice(invoice)
 }
 
-func (u *invoiceUseCase) TransitionStatus(invoiceId string, status domain.InvoiceStatus, changedBy string) (domain.Invoice, error) {
+func (u *invoiceUseCase) TransitionStatus(invoiceId string, status domain.InvoiceStatus, changedBy string, changedByUserId string) (domain.Invoice, error) {
 	existing, err := u.invoiceRepository.GetInvoice(invoiceId)
 	if err != nil {
 		return domain.Invoice{}, err
@@ -85,25 +85,72 @@ func (u *invoiceUseCase) TransitionStatus(invoiceId string, status domain.Invoic
 	if err := validateStatusTransition(existing.Status, status); err != nil {
 		return domain.Invoice{}, err
 	}
+	if err := validatePermission(existing, status, changedByUserId); err != nil {
+		return domain.Invoice{}, err
+	}
 	updated, err := u.invoiceRepository.UpdateInvoiceStatus(invoiceId, status, changedBy)
 	if err != nil {
 		return domain.Invoice{}, err
 	}
-	if status == domain.InvoiceStatusSent {
-		if err := infrastructure.SendPDFGenerateMessage(updated); err != nil {
-			fmt.Printf("warning: failed to send PDF generate message: %v\n", err)
+
+	// Handle side effects based on transition
+	switch status {
+	case domain.InvoiceStatusSent:
+		if existing.Status == domain.InvoiceStatusDraft {
+			// Fresh send: PDF generation + notification with pay button
+			var billingClientSlackUserId string
+			if updated.BillingClientId != "" {
+				client, err := u.clientRepository.GetClient(updated.BillingClientId)
+				if err != nil {
+					fmt.Printf("warning: failed to get client for notification: %v\n", err)
+				} else {
+					billingClientSlackUserId = client.SlackUserId
+				}
+			}
+			if err := infrastructure.SendPDFGenerateMessage(updated, billingClientSlackUserId); err != nil {
+				fmt.Printf("warning: failed to send PDF generate message: %v\n", err)
+			}
+			if billingClientSlackUserId != "" {
+				if err := infrastructure.SendInvoiceNotificationWithPayButton(billingClientSlackUserId, updated); err != nil {
+					fmt.Printf("warning: failed to send invoice notification DM: %v\n", err)
+				}
+			}
 		}
+	case domain.InvoiceStatusPaid:
+		// Notify issuer with confirm/reject buttons
+		if updated.IssuerSlackUserId != "" {
+			if err := infrastructure.SendPaymentConfirmationRequestDM(updated.IssuerSlackUserId, updated); err != nil {
+				fmt.Printf("warning: failed to send payment confirmation request DM: %v\n", err)
+			}
+		}
+	case domain.InvoiceStatusConfirmed:
+		// Notify client that payment is confirmed
 		if updated.BillingClientId != "" {
 			client, err := u.clientRepository.GetClient(updated.BillingClientId)
 			if err != nil {
 				fmt.Printf("warning: failed to get client for notification: %v\n", err)
 			} else if client.SlackUserId != "" {
-				if err := infrastructure.SendInvoiceNotificationDM(client.SlackUserId, updated); err != nil {
-					fmt.Printf("warning: failed to send invoice notification DM: %v\n", err)
+				if err := infrastructure.SendPaymentConfirmedDM(client.SlackUserId, updated); err != nil {
+					fmt.Printf("warning: failed to send payment confirmed DM: %v\n", err)
 				}
 			}
 		}
 	}
+
+	// Handle paid→sent rejection: notify client with pay button again
+	if existing.Status == domain.InvoiceStatusPaid && status == domain.InvoiceStatusSent {
+		if updated.BillingClientId != "" {
+			client, err := u.clientRepository.GetClient(updated.BillingClientId)
+			if err != nil {
+				fmt.Printf("warning: failed to get client for notification: %v\n", err)
+			} else if client.SlackUserId != "" {
+				if err := infrastructure.SendPaymentRejectedDM(client.SlackUserId, updated); err != nil {
+					fmt.Printf("warning: failed to send payment rejected DM: %v\n", err)
+				}
+			}
+		}
+	}
+
 	return updated, nil
 }
 
@@ -122,7 +169,8 @@ func validateStatusTransition(from, to domain.InvoiceStatus) error {
 	allowed := map[domain.InvoiceStatus][]domain.InvoiceStatus{
 		domain.InvoiceStatusDraft:     {domain.InvoiceStatusSent, domain.InvoiceStatusCancelled},
 		domain.InvoiceStatusSent:      {domain.InvoiceStatusPaid, domain.InvoiceStatusCancelled},
-		domain.InvoiceStatusPaid:      {},
+		domain.InvoiceStatusPaid:      {domain.InvoiceStatusConfirmed, domain.InvoiceStatusSent},
+		domain.InvoiceStatusConfirmed: {},
 		domain.InvoiceStatusCancelled: {},
 	}
 	for _, s := range allowed[from] {
@@ -131,4 +179,25 @@ func validateStatusTransition(from, to domain.InvoiceStatus) error {
 		}
 	}
 	return fmt.Errorf("invalid status transition from %s to %s", from, to)
+}
+
+func validatePermission(invoice domain.Invoice, targetStatus domain.InvoiceStatus, changedByUserId string) error {
+	switch targetStatus {
+	case domain.InvoiceStatusPaid:
+		// sent→paid: only non-issuer (recipient) can mark as paid
+		if changedByUserId == invoice.IssuerSlackUserId {
+			return fmt.Errorf("issuer cannot mark their own invoice as paid")
+		}
+	case domain.InvoiceStatusConfirmed:
+		// paid→confirmed: only issuer can confirm
+		if changedByUserId != invoice.IssuerSlackUserId {
+			return fmt.Errorf("only the issuer can confirm payment")
+		}
+	case domain.InvoiceStatusSent:
+		// paid→sent (rejection): only issuer can reject
+		if invoice.Status == domain.InvoiceStatusPaid && changedByUserId != invoice.IssuerSlackUserId {
+			return fmt.Errorf("only the issuer can reject payment")
+		}
+	}
+	return nil
 }

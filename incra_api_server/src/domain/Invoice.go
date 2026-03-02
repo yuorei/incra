@@ -8,6 +8,7 @@ const (
 	InvoiceStatusDraft     InvoiceStatus = "draft"
 	InvoiceStatusSent      InvoiceStatus = "sent"
 	InvoiceStatusPaid      InvoiceStatus = "paid"
+	InvoiceStatusConfirmed InvoiceStatus = "confirmed"
 	InvoiceStatusCancelled InvoiceStatus = "cancelled"
 )
 

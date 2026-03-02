@@ -12,14 +12,23 @@ import (
 	"github.com/yuorei/incra_api_server/src/domain"
 )
 
-func SendPDFGenerateMessage(invoice domain.Invoice) error {
+type PDFGenerateMessage struct {
+	domain.Invoice
+	BillingClientSlackUserId string `json:"billing_client_slack_user_id"`
+}
+
+func SendPDFGenerateMessage(invoice domain.Invoice, billingClientSlackUserId string) error {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		return err
 	}
 	client := sqs.NewFromConfig(cfg)
 	queueUrl := os.Getenv("QUEUE_URL")
-	body, err := json.Marshal(invoice)
+	msg := PDFGenerateMessage{
+		Invoice:                  invoice,
+		BillingClientSlackUserId: billingClientSlackUserId,
+	}
+	body, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}

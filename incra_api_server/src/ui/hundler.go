@@ -173,10 +173,11 @@ func (s *ServerImpl) UpdateInvoiceStatus(ctx echo.Context, invoiceId string) err
 	}
 
 	changedBy := ctx.Request().Header.Get("X-Slack-User-Name")
+	changedByUserId := ctx.Request().Header.Get("X-Slack-User-Id")
 	if changedBy == "" {
-		changedBy = ctx.Request().Header.Get("X-Slack-User-Id")
+		changedBy = changedByUserId
 	}
-	updated, err := s.invoiceUseCase.TransitionStatus(invoiceId, domain.InvoiceStatus(req.Status), changedBy)
+	updated, err := s.invoiceUseCase.TransitionStatus(invoiceId, domain.InvoiceStatus(req.Status), changedBy, changedByUserId)
 	if err != nil {
 		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
@@ -469,9 +470,6 @@ func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
 }
 
 func (s *ServerImpl) SlackInteractionHandler(c echo.Context) error {
-	slackToken := os.Getenv("SLACK_TOKEN")
-	api := slack.New(slackToken)
-
 	payload := c.FormValue("payload")
 	if payload == "" {
 		return c.String(http.StatusBadRequest, "missing payload")
@@ -482,9 +480,19 @@ func (s *ServerImpl) SlackInteractionHandler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "invalid payload")
 	}
 
-	if interaction.Type != slack.InteractionTypeViewSubmission {
+	switch interaction.Type {
+	case slack.InteractionTypeViewSubmission:
+		return s.handleViewSubmission(c, interaction)
+	case slack.InteractionTypeBlockActions:
+		return s.handleBlockActions(c, interaction)
+	default:
 		return c.String(http.StatusOK, "")
 	}
+}
+
+func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.InteractionCallback) error {
+	slackToken := os.Getenv("SLACK_TOKEN")
+	api := slack.New(slackToken)
 
 	values := interaction.View.State.Values
 
@@ -561,15 +569,15 @@ func (s *ServerImpl) SlackInteractionHandler(c echo.Context) error {
 	}
 
 	// ステータスをsentに遷移
-	sent, err := s.invoiceUseCase.TransitionStatus(created.InvoiceId, domain.InvoiceStatusSent, issuerSlackRealName)
+	sent, err := s.invoiceUseCase.TransitionStatus(created.InvoiceId, domain.InvoiceStatusSent, issuerSlackRealName, issuerSlackUserId)
 	if err != nil {
 		fmt.Printf("warning: failed to transition invoice to sent: %v\n", err)
 		sent = created
 	}
 
-	// 請求先担当者にDM通知
+	// 請求先担当者にDM通知（ボタン付き）
 	if billingUser != "" {
-		if err := infrastructure.SendInvoiceNotificationDM(billingUser, sent); err != nil {
+		if err := infrastructure.SendInvoiceNotificationWithPayButton(billingUser, sent); err != nil {
 			fmt.Printf("warning: failed to send billing user notification DM: %v\n", err)
 		}
 	}
@@ -584,6 +592,63 @@ func (s *ServerImpl) SlackInteractionHandler(c echo.Context) error {
 	_, _, err = api.PostMessage(issuerSlackUserId, slack.MsgOptionText(message, false))
 	if err != nil {
 		fmt.Printf("failed to send message: %v\n", err)
+	}
+
+	return c.String(http.StatusOK, "")
+}
+
+func (s *ServerImpl) handleBlockActions(c echo.Context, interaction slack.InteractionCallback) error {
+	slackToken := os.Getenv("SLACK_TOKEN")
+	api := slack.New(slackToken)
+
+	if len(interaction.ActionCallback.BlockActions) == 0 {
+		return c.String(http.StatusOK, "")
+	}
+
+	action := interaction.ActionCallback.BlockActions[0]
+	invoiceId := action.Value
+	changedByUserId := interaction.User.ID
+	changedBy := interaction.User.Name
+
+	var targetStatus domain.InvoiceStatus
+	var successMessage string
+
+	switch action.ActionID {
+	case "mark_paid":
+		targetStatus = domain.InvoiceStatusPaid
+		successMessage = fmt.Sprintf("請求書 %s の支払いを報告しました", invoiceId)
+	case "confirm_payment":
+		targetStatus = domain.InvoiceStatusConfirmed
+		successMessage = fmt.Sprintf("請求書 %s の支払いを確認しました", invoiceId)
+	case "reject_payment":
+		targetStatus = domain.InvoiceStatusSent
+		successMessage = fmt.Sprintf("請求書 %s の支払いを差し戻しました", invoiceId)
+	default:
+		return c.String(http.StatusOK, "")
+	}
+
+	_, err := s.invoiceUseCase.TransitionStatus(invoiceId, targetStatus, changedBy, changedByUserId)
+	if err != nil {
+		// エフェメラルメッセージでエラー通知
+		_, err2 := api.PostEphemeral(
+			interaction.Channel.ID,
+			changedByUserId,
+			slack.MsgOptionText(fmt.Sprintf("エラー: %v", err), false),
+		)
+		if err2 != nil {
+			fmt.Printf("warning: failed to send ephemeral error message: %v\n", err2)
+		}
+		return c.String(http.StatusOK, "")
+	}
+
+	// 成功時: 元メッセージを更新してボタンを消去
+	_, _, _, err = api.UpdateMessage(
+		interaction.Channel.ID,
+		interaction.Message.Timestamp,
+		slack.MsgOptionText(successMessage, false),
+	)
+	if err != nil {
+		fmt.Printf("warning: failed to update message: %v\n", err)
 	}
 
 	return c.String(http.StatusOK, "")

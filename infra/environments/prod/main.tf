@@ -98,7 +98,7 @@ module "pdf_generate_iam" {
 
   role_name          = "python_lambda_role"
   policy_name        = "pdf-generate-lambda-policy"
-  policy_description = "PDF Generate Lambda: SQS consume + DynamoDB write on invoices"
+  policy_description = "PDF Generate Lambda: SQS consume"
 
   policy_statements = [
     {
@@ -110,16 +110,6 @@ module "pdf_generate_iam" {
       ]
       resources = [
         module.pdf_queue.queue_arn
-      ]
-    },
-    {
-      effect = "Allow"
-      actions = [
-        "dynamodb:UpdateItem",
-        "dynamodb:GetItem"
-      ]
-      resources = [
-        "arn:aws:dynamodb:${var.region}:*:table/${var.invoice_table_name}"
       ]
     }
   ]
@@ -247,13 +237,13 @@ module "pdf_generate_lambda" {
   handler       = "handler.lambda_handler"
   runtime       = "python3.10"
   role_arn      = module.pdf_generate_iam.role_arn
+  timeout       = 60
 
   environment_variables = {
-    ENV                = "production"
-    FONT_NAME          = var.font_name
-    FONT_PATH          = var.font_path
-    INVOICE_TABLE_NAME = var.invoice_table_name
-    SLACK_TOKEN        = var.slack_token
+    ENV         = "production"
+    FONT_NAME   = var.font_name
+    FONT_PATH   = var.font_path
+    SLACK_TOKEN = var.slack_token
   }
 }
 

@@ -62,7 +62,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [draft, sent, paid, cancelled]
+            enum: [draft, sent, paid, confirmed, cancelled]
         - name: limit
           in: query
           required: false
@@ -376,7 +376,7 @@ components:
       properties:
         status:
           type: string
-          enum: [draft, sent, paid, cancelled]
+          enum: [draft, sent, paid, confirmed, cancelled]
           description: "変更先ステータス"
 
     Invoice:
@@ -386,7 +386,7 @@ components:
           type: string
         status:
           type: string
-          enum: [draft, sent, paid, cancelled]
+          enum: [draft, sent, paid, confirmed, cancelled]
         billing_client_id:
           type: string
         billing_client_name:

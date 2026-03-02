@@ -18,6 +18,7 @@ const STATUS_LABELS: Record<string, string> = {
   draft: "下書き",
   sent: "送信済み",
   paid: "支払い済み",
+  confirmed: "確認済み",
   cancelled: "キャンセル",
 };
 
@@ -25,6 +26,7 @@ const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300",
   sent: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
   paid: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+  confirmed: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
   cancelled: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
 };
 
@@ -60,6 +62,7 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
     { label: "下書き", value: "draft" },
     { label: "送信済み", value: "sent" },
     { label: "支払い済み", value: "paid" },
+    { label: "確認済み", value: "confirmed" },
     { label: "キャンセル", value: "cancelled" },
   ];
 

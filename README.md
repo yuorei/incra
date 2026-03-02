@@ -12,7 +12,9 @@ Go製のバックエンドAPIサーバー。AWS Lambda上で動作します。
 - **アーキテクチャ**: クリーンアーキテクチャ（domain / usecase / ui / infrastructure）
 - **主な機能**:
   - 請求書CRUD（作成・一覧・詳細・更新・削除）
-  - ステータス管理（draft → sent → paid / cancelled）
+  - ステータス管理（draft → sent → paid → confirmed / cancelled）
+  - 二段階支払い確認フロー（受取人が支払い報告 → 発行者が確認/差し戻し）
+  - 権限ベースのステータス遷移バリデーション
   - 取引先マスタ管理
   - 請求書番号の自動採番（INV-YYYY-NNNN）
   - SQS経由のPDF生成トリガー
@@ -33,11 +35,10 @@ Go製のリマインダーLambda関数。EventBridge Schedulerから毎日9:00 J
 
 Python製のPDF生成Lambda関数。請求書のPDF出力を担当します。
 
-- **技術スタック**: Python 3.10, ReportLab
+- **技術スタック**: Python 3.10, ReportLab, slack_sdk
 - **主な機能**:
   - SQSからフルインボイスデータを受信してPDF生成
-  - Cloudflare R2へのアップロード
-  - DynamoDBへのPDF URL更新
+  - Slack DMで請求先クライアントへPDFファイル送信
 - **デプロイ**: AWS Lambda
 
 ### 4. Web Frontend (incra-web/)
@@ -115,17 +116,18 @@ npm run dev
 | GET | /slack/users | ワークスペースユーザー一覧 |
 | POST | /slack/events | Slackイベント受信 |
 | POST | /slack/slashs | スラッシュコマンド（請求書作成モーダル） |
-| POST | /slack/interactions | モーダル送信処理 |
+| POST | /slack/interactions | モーダル送信・ボタンアクション処理 |
 
 ## E2Eフロー
 
 1. 取引先登録（Web UI or API）- Slackユーザードロップダウンから選択可能
 2. 請求書作成（draft状態）
-3. draft → sent ステータス遷移（PDF生成SQS送信 + 取引先Slack DM通知）
-4. PDF生成Lambda実行 → R2アップロード → DynamoDB pdf_url更新
-5. sent → paid ステータス遷移
-6. Web UIで一覧・詳細・PDF確認
-7. リマインダーLambdaが期限間近の請求書をSlack通知
+3. A(発行者): draft → sent ステータス遷移（PDF生成SQS送信 + 取引先Slack DM通知「支払った」ボタン付き）
+4. PDF生成Lambda実行 → Slack DMで請求先クライアントへPDFファイル送信
+5. B(受取人): sent → paid（支払い報告）→ A宛にSlack DM「確認/差し戻し」ボタン付き
+6. A: paid → confirmed（支払い確認）→ B宛に確認完了DM / または paid → sent（差し戻し）→ B宛に差し戻しDM
+7. Web UIで一覧・詳細・PDF確認（ロールに応じたボタン表示）
+8. リマインダーLambdaが期限間近の請求書をSlack通知
 
 ### Slackフロー（スラッシュコマンド）
 
@@ -133,7 +135,13 @@ npm run dev
 2. 送信 → 請求書作成（draft） → 即sent遷移
 3. PDF生成（SQS送信）
 4. 発行者にDM: 「請求書を作成・送付しました」
-5. 請求先担当者にDM: 「請求書が届きました」（選択されていれば）
+5. 請求先担当者にDM: 「請求書が届きました」+「支払った」ボタン（選択されていれば）
+
+### Slackフロー（ボタンアクション）
+
+1. B が「支払った」ボタン → sent → paid → A にDM（「確認」「差し戻し」ボタン付き）
+2. A が「確認」ボタン → paid → confirmed → B にDM（確認完了通知）
+3. A が「差し戻し」ボタン → paid → sent → B にDM（差し戻し通知 +「支払った」ボタン再表示）
 
 ## デプロイ
 
