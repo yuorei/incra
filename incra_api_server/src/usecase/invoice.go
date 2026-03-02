@@ -184,19 +184,17 @@ func validateStatusTransition(from, to domain.InvoiceStatus) error {
 func validatePermission(invoice domain.Invoice, targetStatus domain.InvoiceStatus, changedByUserId string) error {
 	switch targetStatus {
 	case domain.InvoiceStatusPaid:
-		// sent→paid: only non-issuer (recipient) can mark as paid
-		if changedByUserId == invoice.IssuerSlackUserId {
-			return fmt.Errorf("issuer cannot mark their own invoice as paid")
-		}
+		// todo: 動作確認のために一時的に制限解除
+		// if changedByUserId == invoice.IssuerSlackUserId {
+		// 	return fmt.Errorf("自分が発行した請求書に対して支払い報告はできません。受取人のみが操作できます。")
+		// }
 	case domain.InvoiceStatusConfirmed:
-		// paid→confirmed: only issuer can confirm
 		if changedByUserId != invoice.IssuerSlackUserId {
-			return fmt.Errorf("only the issuer can confirm payment")
+			return fmt.Errorf("支払いの確認は請求書の発行者のみが操作できます。")
 		}
 	case domain.InvoiceStatusSent:
-		// paid→sent (rejection): only issuer can reject
 		if invoice.Status == domain.InvoiceStatusPaid && changedByUserId != invoice.IssuerSlackUserId {
-			return fmt.Errorf("only the issuer can reject payment")
+			return fmt.Errorf("支払いの差し戻しは請求書の発行者のみが操作できます。")
 		}
 	}
 	return nil

@@ -633,7 +633,7 @@ func (s *ServerImpl) handleBlockActions(c echo.Context, interaction slack.Intera
 		_, err2 := api.PostEphemeral(
 			interaction.Channel.ID,
 			changedByUserId,
-			slack.MsgOptionText(fmt.Sprintf("エラー: %v", err), false),
+			slack.MsgOptionText(err.Error(), false),
 		)
 		if err2 != nil {
 			fmt.Printf("warning: failed to send ephemeral error message: %v\n", err2)
