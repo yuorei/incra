@@ -61,8 +61,10 @@ def lambda_handler(event, context):
             # Slack DMでPDFファイルを送信
             if billing_client_slack_user_id:
                 try:
+                    dm = slack_client.conversations_open(users=[billing_client_slack_user_id])
+                    dm_channel_id = dm['channel']['id']
                     slack_client.files_upload_v2(
-                        channel=billing_client_slack_user_id,
+                        channel=dm_channel_id,
                         file=file_path,
                         title=f"請求書 {invoice_id}",
                         initial_comment=f"請求書 {invoice_id} のPDFです。",
