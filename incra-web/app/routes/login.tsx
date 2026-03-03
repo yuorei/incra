@@ -10,7 +10,7 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const { env } = context.cloudflare;
   const session = await getSession(request, env.SESSION_SECRET);
-  if (session) throw redirect("/");
+  if (session) throw redirect("/invoices");
 
   const url = new URL(request.url);
   const error = url.searchParams.get("error");

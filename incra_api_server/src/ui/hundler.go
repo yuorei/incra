@@ -284,7 +284,7 @@ func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
 	}
 	billingUserSelect := slack.NewInputBlock(
 		"billing_user_block",
-		slack.NewTextBlockObject(slack.PlainTextType, "請求先担当者", false, false),
+		slack.NewTextBlockObject(slack.PlainTextType, "請求先", false, false),
 		nil,
 		billingUserElement,
 	)
