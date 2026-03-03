@@ -99,7 +99,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return new Response(null, {
     status: 302,
     headers: new Headers([
-      ["Location", "/"],
+      ["Location", "/invoices"],
       ["Set-Cookie", clearCookie],
       ["Set-Cookie", sessionCookie],
     ]),

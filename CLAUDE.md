@@ -37,7 +37,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. **incra-web/** - React Router製のフロントエンドアプリケーション（Cloudflare Workersで動作）
    - React Router v7を使用したSSR対応のWebアプリケーション
    - `app/routes/` - ファイルシステムベースルーティング
+     - `home`（`/`）- パブリックランディングページ（認証不要、アプリ紹介）
+     - `login` - Slack OAuthログイン（認証済みなら`/invoices`へリダイレクト）
+     - `logout` - ログアウト（セッションクリア → `/login`へリダイレクト）
      - 請求書管理: `invoices._index`（発行済み・受領済みタブ切替）, `invoices.new`, `invoices.$invoiceId`, `invoices.$invoiceId.edit`
+   - `app/components/auth-header.tsx` - 共通認証ヘッダー（ロゴ、ナビ、ユーザー情報、ログアウト）
    - `app/lib/api.ts` - APIフェッチヘルパー（X-Slack-User-Idヘッダー付与）
    - `workers/app.ts` - Cloudflare Workers エントリーポイント
    - TailwindCSS v4でスタイリング

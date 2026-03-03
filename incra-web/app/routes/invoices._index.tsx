@@ -2,6 +2,7 @@ import { redirect, Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/invoices._index";
 import { getSession } from "../lib/session";
 import { apiFetch } from "../lib/api";
+import { AuthHeader } from "../components/auth-header";
 
 type Invoice = {
   invoice_id: string;
@@ -88,19 +89,18 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
     return q ? `/invoices?${q}` : "/invoices";
   }
 
+  const { user } = loaderData;
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <nav className="flex gap-4 items-center">
-            <Link to="/" className="text-xl font-bold text-gray-800 dark:text-white">incra</Link>
-            <Link to="/invoices" className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-semibold">請求書</Link>
-          </nav>
+      <AuthHeader
+        user={user}
+        actions={
           <Link to="/invoices/new" className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
             新規作成
           </Link>
-        </div>
-      </header>
+        }
+      />
       <main className="max-w-6xl mx-auto px-4 py-8">
         <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">請求書一覧</h2>
         <div className="flex gap-2 mb-4">

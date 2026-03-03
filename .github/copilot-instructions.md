@@ -22,8 +22,12 @@
    - SQSからインボイスデータ受信 → PDF生成 → Slack DMで請求先ユーザーへPDFファイル送信
 
 3. **incra-web/** - React Router v7フロントエンド（Cloudflare Workers）
+   - `app/routes/home` - パブリックランディングページ（`/`、認証不要）
+   - `app/routes/logout` - ログアウト（セッションクリア）
    - `app/routes/invoices.*` - 請求書管理ページ群（発行済み・受領済みタブ切替）
+   - `app/components/auth-header.tsx` - 共通認証ヘッダー（ユーザー情報・ログアウト）
    - `app/lib/api.ts` - 認証ヘッダー付きAPIフェッチヘルパー
+   - ログイン後のリダイレクト先は`/invoices`（`/`ではなく）
 
 4. **infra/** - Terraform構成（モジュール化・環境分離）
    - `modules/` - 再利用可能なTerraformモジュール（lambda, api_gateway, dynamodb, sqs, eventbridge, iam）

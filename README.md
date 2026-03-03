@@ -47,9 +47,11 @@ React Router製のフロントエンドアプリケーション。Cloudflare Wor
 
 - **技術スタック**: React 19, React Router v7, TailwindCSS v4, TypeScript
 - **主な機能**:
+  - パブリックランディングページ（`/`）- アプリ紹介・特徴・使い方
   - 請求書の作成・一覧・詳細・編集・ステータス遷移UI
   - 発行済み・受領済みタブ切替による請求書一覧表示
-  - Slack OAuthログイン
+  - Slack OAuthログイン（認証後は`/invoices`へリダイレクト）
+  - 共通認証ヘッダー（ユーザー情報・ログアウト機能）
   - SSR (Server-Side Rendering) 対応
 - **デプロイ**: Cloudflare Workers
 
