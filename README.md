@@ -153,15 +153,11 @@ GitHub Actionsを使用したCI/CDパイプラインが設定されています:
 - Terraform stateはS3（`incra-terraform-state`）で管理、DynamoDB（`incra-terraform-locks`）でロック
 
 ### Webフロントエンド
-- Cloudflare Workersは `wrangler deploy` でデプロイ
+- Cloudflare Workersは `npm run deploy` でデプロイ
 
 ## 開発ガイド
 
 開発者向けの詳細なガイドラインは [CLAUDE.md](CLAUDE.md) を参照してください。
-
-## ライセンス
-
-このプロジェクトはプライベートリポジトリです。
 
 ## サポート
 
