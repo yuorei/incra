@@ -11,7 +11,6 @@ def lambda_handler(event, context):
     logger = logging.getLogger()
 
     logger.info("Processing PDF generation request...")
-    logger.info(f"Event: {json.dumps(event)}")
 
     slack_client = WebClient(token=os.environ.get('SLACK_TOKEN'))
 
@@ -23,7 +22,8 @@ def lambda_handler(event, context):
             logger.info(f"Processing invoice: {invoice_data.get('invoice_id')}")
 
             invoice_id = invoice_data.get('invoice_id', 'unknown')
-            file_path = f"/tmp/{invoice_id}.pdf"
+            safe_filename = "".join(c for c in invoice_id if c.isalnum() or c in ('-', '_'))
+            file_path = f"/tmp/{safe_filename}.pdf"
 
             # 品目データの変換
             items = invoice_data.get('items', [])

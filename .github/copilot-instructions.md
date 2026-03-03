@@ -57,7 +57,7 @@ cd infra/global/oidc && terraform init && terraform plan
   - `incra_api_server/`, `pdf_generate/`, `infra/` の変更で発火
   - Go/Python Lambdaビルド → OIDC認証 → Terraform apply
   - Terraform state: S3（`incra-terraform-state`）+ DynamoDBロック（`incra-terraform-locks`）
-- PR時: Terraform plan自動実行 + PRコメント
+- PR時: 全Lambda（Go + Python）ビルド → Terraform plan自動実行 + PRコメント
 
 ## コーディング規約
 

@@ -100,7 +100,7 @@ pip install -r pdf_generate/src/requirements.txt
 # ローカルでの動作確認
 python pdf_generate/src/handler.py
 
-# Lambda用zipパッケージ作成（terraform/lambda/python_lambda.zipを生成）
+# Lambda用zipパッケージ作成（infra/environments/prod/lambda/python_lambda.zipを生成）
 cd pdf_generate/src && ./build.sh
 ```
 
@@ -168,7 +168,7 @@ terraform plan
 
 - Go Lambda関数は`lambda.norpc`ビルドタグが必須
 - `build.sh`スクリプトがAPI ServerとReminder Lambdaのビルドとzip化を自動実行
-- 出力先は各サービスの`terraform/lambda/`ディレクトリ
+- 出力先は`infra/environments/prod/lambda/`ディレクトリ
 - CI/CDでも同じビルド設定を使用すること
 
 ## Secrets Management
@@ -180,8 +180,7 @@ terraform plan
 
 ## CI/CD Workflows
 
-- `.github/workflows/incra_api_server_plan.yaml` - PRで `infra/` 変更時にTerraform plan実行
-- `.github/workflows/pdf_generate_plan.yaml` - PRで `infra/` 変更時にTerraform plan実行（Python Lambda含む）
+- `.github/workflows/incra_api_server_plan.yaml` - PRで `infra/` 変更時に全Lambda（Go + Python）をビルドしTerraform plan実行
 - `.github/workflows/pdf_generate_apply.yaml` - `/apply` コメントでTerraform apply実行（手動トリガー）
 - `.github/workflows/deploy.yaml` - **mainブランチへのpush時に自動デプロイ**
   - トリガー: `incra_api_server/`, `pdf_generate/`, `infra/` のいずれかが変更された場合

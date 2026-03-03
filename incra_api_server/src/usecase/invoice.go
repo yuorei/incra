@@ -50,8 +50,9 @@ func (u *invoiceUseCase) CreateInvoice(invoice domain.Invoice) (domain.Invoice, 
 	invoice.InvoiceId = invoiceId
 	invoice.Status = domain.InvoiceStatusDraft
 	total := 0
-	for _, item := range invoice.Items {
-		total += item.Amount
+	for i := range invoice.Items {
+		invoice.Items[i].Amount = invoice.Items[i].Quantity * invoice.Items[i].UnitPrice
+		total += invoice.Items[i].Amount
 	}
 	invoice.TotalAmount = total
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -68,16 +69,40 @@ func (u *invoiceUseCase) UpdateInvoice(invoice domain.Invoice) (domain.Invoice, 
 	if existing.Status != domain.InvoiceStatusDraft {
 		return domain.Invoice{}, fmt.Errorf("下書き状態の請求書のみ編集できます")
 	}
-	total := 0
-	for _, item := range invoice.Items {
-		total += item.Amount
+
+	// Merge: only overwrite fields that were explicitly provided (non-zero)
+	if invoice.BillingClientId != "" {
+		existing.BillingClientId = invoice.BillingClientId
 	}
-	invoice.TotalAmount = total
-	invoice.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	invoice.CreatedAt = existing.CreatedAt
-	invoice.IssuerSlackUserId = existing.IssuerSlackUserId
-	invoice.IssuerSlackRealName = existing.IssuerSlackRealName
-	return u.invoiceRepository.UpdateInvoice(invoice)
+	if invoice.BillingClientName != "" {
+		existing.BillingClientName = invoice.BillingClientName
+	}
+	if invoice.BillingSlackUserId != "" {
+		existing.BillingSlackUserId = invoice.BillingSlackUserId
+	}
+	if invoice.DueDate != "" {
+		existing.DueDate = invoice.DueDate
+	}
+	if invoice.BankDetails != "" {
+		existing.BankDetails = invoice.BankDetails
+	}
+	if invoice.AdditionalInfo != "" {
+		existing.AdditionalInfo = invoice.AdditionalInfo
+	}
+	if invoice.Items != nil {
+		existing.Items = invoice.Items
+	}
+
+	// Recalculate amounts server-side
+	total := 0
+	for i := range existing.Items {
+		existing.Items[i].Amount = existing.Items[i].Quantity * existing.Items[i].UnitPrice
+		total += existing.Items[i].Amount
+	}
+	existing.TotalAmount = total
+	existing.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+
+	return u.invoiceRepository.UpdateInvoice(existing)
 }
 
 func (u *invoiceUseCase) TransitionStatus(invoiceId string, status domain.InvoiceStatus, changedBy string, changedByUserId string) (domain.Invoice, error) {

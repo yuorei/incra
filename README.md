@@ -143,7 +143,7 @@ npm run dev
 GitHub Actionsを使用したCI/CDパイプラインが設定されています:
 
 ### PR時（CI）
-- `infra/` 変更時にTerraform planを自動実行し、PRコメントに結果を表示
+- `infra/` 変更時に全Lambda（Go + Python）をビルドしTerraform planを自動実行、PRコメントに結果を表示
 - `/apply` コメントで手動Terraform apply（レビュー後の即時適用）
 
 ### mainマージ時（CD）

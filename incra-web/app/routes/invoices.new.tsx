@@ -41,8 +41,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   const itemCount = parseInt(formData.get("item_count") as string, 10) || 0;
   const items = [];
   for (let i = 0; i < itemCount; i++) {
-    const quantity = parseFloat(formData.get(`items[${i}].quantity`) as string) || 0;
-    const unitPrice = parseFloat(formData.get(`items[${i}].unit_price`) as string) || 0;
+    const quantity = parseInt(formData.get(`items[${i}].quantity`) as string, 10) || 0;
+    const unitPrice = parseInt(formData.get(`items[${i}].unit_price`) as string, 10) || 0;
     items.push({
       date: formData.get(`items[${i}].date`) as string,
       description: formData.get(`items[${i}].description`) as string,
@@ -230,9 +230,9 @@ export default function InvoicesNew({ loaderData, actionData }: Route.ComponentP
                         type="number"
                         name={`items[${index}].quantity`}
                         value={item.quantity}
-                        onChange={(e) => updateItem(item.key, "quantity", parseFloat(e.target.value) || 0)}
-                        min={0}
-                        step="any"
+                        onChange={(e) => updateItem(item.key, "quantity", parseInt(e.target.value, 10) || 0)}
+                        min={1}
+                        step="1"
                         required
                         className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-2 py-1 text-sm"
                       />
@@ -243,9 +243,9 @@ export default function InvoicesNew({ loaderData, actionData }: Route.ComponentP
                         type="number"
                         name={`items[${index}].unit_price`}
                         value={item.unit_price}
-                        onChange={(e) => updateItem(item.key, "unit_price", parseFloat(e.target.value) || 0)}
+                        onChange={(e) => updateItem(item.key, "unit_price", parseInt(e.target.value, 10) || 0)}
                         min={0}
-                        step="any"
+                        step="1"
                         required
                         className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-2 py-1 text-sm"
                       />
