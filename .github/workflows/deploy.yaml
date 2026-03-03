@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - feature/history 
     paths:
       - incra_api_server/**
       - pdf_generate/**

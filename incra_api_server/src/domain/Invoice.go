@@ -1,7 +1,5 @@
 package domain
 
-import "time"
-
 type InvoiceStatus string
 
 const (
@@ -52,5 +50,3 @@ type Invoice struct {
 
 // InvoiceResponse is an alias for Invoice for backward compatibility
 type InvoiceResponse = Invoice
-
-var _ = time.Now
