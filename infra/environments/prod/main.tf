@@ -281,6 +281,7 @@ module "reminder_schedule" {
   source = "../../modules/eventbridge"
 
   schedule_name       = "incra-reminder-daily"
-  schedule_expression = "cron(0 0 * * ? *)"
+  # schedule_expression = "cron(0 0 * * ? *)"
+  schedule_expression = "cron(30 10 * * ? *)" # 毎日19:30に実行（JST）
   target_lambda_arn   = module.reminder_lambda.function_arn
 }
