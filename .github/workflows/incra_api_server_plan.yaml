@@ -73,6 +73,8 @@ jobs:
       # --- Terraform ---
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -115,7 +117,7 @@ jobs:
             -var "web_base_url=${WEB_BASE_URL}" \
             -var "font_name=${FONT_NAME}" \
             -var "font_path=${FONT_PATH}" \
-            | tee -a plan_raw.txt
+            2>&1 | tee -a plan_raw.txt
         working-directory: infra/environments/prod
 
       - name: Reformat Plan
@@ -134,7 +136,7 @@ jobs:
           echo "EOF" >> $GITHUB_ENV
 
       - name: Read Plan and Post Comment
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
