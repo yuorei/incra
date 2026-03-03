@@ -1,0 +1,8 @@
+# Copy this file to .dev.vars and fill in the values for local development
+# .dev.vars is gitignored and should never be committed
+
+SLACK_CLIENT_ID=your_slack_client_id_here
+SLACK_CLIENT_SECRET=your_slack_client_secret_here
+SESSION_SECRET=replace_with_at_least_32_random_characters_here
+API_BASE_URL=https://your-api-gateway-url.execute-api.ap-northeast-1.amazonaws.com/api
+WEB_BASE_URL=https://your-web-url.example.com

@@ -23,7 +23,8 @@ class InvoiceGenerator:
     @staticmethod
     def format_date(yyyy_mm_dd: str) -> str:
         try:
-            year, month, day = map(int, yyyy_mm_dd.split('/'))
+            separator = '-' if '-' in yyyy_mm_dd else '/'
+            year, month, day = map(int, yyyy_mm_dd.split(separator))
             if not 1 <= month <= 12 or not 1 <= day <= 31:
                 raise ValueError("Invalid date format. Use yyyy/mm/dd.")
             if month in [4, 6, 9, 11] and day > 30:

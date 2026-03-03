@@ -1,4 +1,4 @@
-name: Incra API Server Terraform Apply
+name: Infra Terraform Apply
 
 on:
   issue_comment:
@@ -8,13 +8,13 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 permissions:
-  id-token: write 
+  id-token: write
   contents: read
 
 jobs:
   terraform-apply:
     if: github.event_name == 'issue_comment' &&
-        contains(github.event.comment.html_url, '/pull/') && 
+        contains(github.event.comment.html_url, '/pull/') &&
         startsWith(github.event.comment.body, '/apply')
     runs-on: ubuntu-latest
 
@@ -36,8 +36,8 @@ jobs:
       - name: zip python code
         run: |
           zip -r ./python_lambda.zip handler.py r2.py python/* ipam.ttf invoice_generator.py
-          mkdir -p ../terraform/lambda
-          mv ./python_lambda.zip ../terraform/lambda/python_lambda.zip
+          mkdir -p ../../infra/environments/prod/lambda
+          mv ./python_lambda.zip ../../infra/environments/prod/lambda/python_lambda.zip
         working-directory: pdf_generate/src
 
       - name: Configure AWS Credentials
@@ -51,26 +51,24 @@ jobs:
 
       - name: Initialize Terraform
         run: terraform init
-        working-directory: pdf_generate/terraform
+        working-directory: infra/environments/prod
 
       - name: Apply Terraform
         env:
+          SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+          SLACK_CLIENT_ID: ${{ secrets.SLACK_CLIENT_ID }}
+          SLACK_CLIENT_SECRET: ${{ secrets.SLACK_CLIENT_SECRET }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          WEB_BASE_URL: ${{ secrets.WEB_BASE_URL }}
           FONT_NAME: ${{ secrets.FONT_NAME }}
           FONT_PATH: ${{ secrets.FONT_PATH }}
-          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_REGION_NAME: ${{ secrets.R2_REGION_NAME }}
-          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
-          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         run: |
           terraform apply -auto-approve \
+            -var "slack_token=${SLACK_TOKEN}" \
+            -var "slack_client_id=${SLACK_CLIENT_ID}" \
+            -var "slack_client_secret=${SLACK_CLIENT_SECRET}" \
+            -var "session_secret=${SESSION_SECRET}" \
+            -var "web_base_url=${WEB_BASE_URL}" \
             -var "font_name=${FONT_NAME}" \
-            -var "font_path=${FONT_PATH}" \
-            -var "r2_endpoint_url=${R2_ENDPOINT_URL}" \
-            -var "r2_access_key_id=${R2_ACCESS_KEY_ID}" \
-            -var "r2_secret_access_key=${R2_SECRET_ACCESS_KEY}" \
-            -var "region_name=${R2_REGION_NAME}" \
-            -var "bucket_name=${BUCKET_NAME}" \
-            -var "aws_account_id=${AWS_ACCOUNT_ID}"
-        working-directory: pdf_generate/terraform
+            -var "font_path=${FONT_PATH}"
+        working-directory: infra/environments/prod

@@ -11,140 +11,340 @@ servers:
     description: "ローカル開発環境"
 
 tags:
-  - name: "generate_invoice"
-    description: "請求書を生成するAPI"
+  - name: "health"
+    description: "ヘルスチェック"
+  - name: "invoices"
+    description: "請求書管理API"
 
 paths:
   /health:
     get:
       tags: ["health"]
       summary: サーバーのヘルスチェック
+      operationId: getHealth
       responses:
         '200':
           description: Successful operation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/health'
-  /invoice:
+                $ref: '#/components/schemas/Health'
+
+  /invoices:
     post:
-      tags: ["generate_invoice"]
-      summary: 請求書を生成
+      tags: ["invoices"]
+      summary: 請求書を作成
+      operationId: createInvoice
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenerateInvoiceRequest'
-        required: true
+              $ref: '#/components/schemas/CreateInvoiceRequest'
       responses:
         '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          description: Invalid input
+    get:
+      tags: ["invoices"]
+      summary: 請求書一覧を取得
+      operationId: listInvoices
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [draft, sent, paid, confirmed, cancelled]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: last_key
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [issued, received]
+      responses:
+        '200':
           description: Successful operation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GenerateInvoiceResponse' 
-        '400':
-          description: Invalid input
-  /invoice/{invoice_id}:
+                $ref: '#/components/schemas/InvoiceListResponse'
+
+  /invoices/{invoice_id}:
     get:
-      tags: ["generate_invoice"]
+      tags: ["invoices"]
       summary: 請求書を取得
+      operationId: getInvoice
       parameters:
         - name: invoice_id
           in: path
           required: true
-          description: 請求書ID
           schema:
-            $ref: '#/components/schemas/InvoiceRequest'
+            type: string
       responses:
         '200':
           description: Successful operation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InvoiceResponse'
+                $ref: '#/components/schemas/Invoice'
+        '404':
+          description: Invoice not found
+    put:
+      tags: ["invoices"]
+      summary: 請求書を更新
+      operationId: updateInvoice
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInvoiceRequest'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
         '400':
-          description: Invalid ID supplied
-        '403':
-          description: Forbidden
+          description: Invalid input
+        '404':
+          description: Invoice not found
+    delete:
+      tags: ["invoices"]
+      summary: 請求書を削除
+      operationId: deleteInvoice
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: Cannot delete non-draft invoice
+        '404':
+          description: Invoice not found
+
+  /invoices/{invoice_id}/status:
+    patch:
+      tags: ["invoices"]
+      summary: 請求書のステータスを変更
+      operationId: updateInvoiceStatus
+      parameters:
+        - name: invoice_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInvoiceStatusRequest'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          description: Invalid status transition
         '404':
           description: Invoice not found
 
 components:
   schemas:
-    health:
+    Health:
       type: object
       properties:
         message:
           type: string
-    GenerateInvoiceRequest:
+
+    InvoiceItem:
       type: object
+      required:
+        - date
+        - description
+        - quantity
+        - unit_price
+        - amount
       properties:
-        billing_slack_user_id:
+        date:
           type: string
-          description: "請求先のSlackのユーザーID"
+          description: "日付"
+        description:
+          type: string
+          description: "品目・内容"
+        quantity:
+          type: integer
+          description: "数量"
+        unit_price:
+          type: integer
+          description: "単価"
         amount:
           type: integer
-          description: "請求金額 (円)"
-        issuer_slack_user_id:
+          description: "金額"
+        memo:
           type: string
-          description: "請求者のSlackのユーザーID"
+          description: "メモ"
+
+    HistoryEntry:
+      type: object
+      properties:
+        changed_at:
+          type: string
+          description: "変更日時"
+        old_status:
+          type: string
+          description: "変更前ステータス"
+        new_status:
+          type: string
+          description: "変更後ステータス"
+        changed_by:
+          type: string
+          description: "変更者"
+
+    CreateInvoiceRequest:
+      type: object
+      required:
+        - billing_slack_user_id
+        - due_date
+        - bank_details
+        - items
+      properties:
+        billing_client_id:
+          type: string
+          description: "請求先クライアントID"
+        billing_client_name:
+          type: string
+          description: "請求先名"
+        billing_slack_user_id:
+          type: string
+          description: "請求先SlackユーザーID"
         due_date:
           type: string
-          format: date
-          description: "支払い期限 (yyyyddmm)"
+          description: "支払期限"
         bank_details:
           type: string
           description: "振込先"
         additional_info:
           type: string
           description: "その他の説明"
-    GenerateInvoiceResponse:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceItem'
+
+    UpdateInvoiceRequest:
       type: object
       properties:
-        success:
-          type: boolean
-          description: "請求書の生成に成功したかどうか"
-        invoice_id:
+        billing_client_id:
           type: string
-          description: "請求書ID"
-    InvoiceRequest:
-      type: object
-      properties:
-        invoice_id:
+        billing_client_name:
           type: string
-          description: "請求書ID"
-    InvoiceResponse:
-      type: object
-      properties:
-        invoice_id:
-          type: string
-          description: "請求書ID"
         billing_slack_user_id:
           type: string
-          description: "請求先のSlackのユーザーID"
-        billing_slack_real_name:
+        due_date:
           type: string
-          description: "請求先のSlackの本名"
-        issuer_slack_user_id:
+        bank_details:
           type: string
-          description: "請求者のSlackのユーザーID"
-        issuer_slack_real_name:
-          type: string
-          description: "請求者のSlackの本名"
-        status:
-          type: string
-          description: "請求書のステータス"
-        paid_date:
-          type: string
-          format: date
-          description: "支払い日 (yyyyddmm)"
-        paid_amount:
-          type: integer
-          description: "支払い金額 (円)"
-        paid_method:
-          type: string
-          description: "支払い方法"
         additional_info:
           type: string
-          description: "その他の説明"
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceItem'
+
+    UpdateInvoiceStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [draft, sent, paid, confirmed, cancelled]
+          description: "変更先ステータス"
+
+    Invoice:
+      type: object
+      properties:
+        invoice_id:
+          type: string
+        status:
+          type: string
+          enum: [draft, sent, paid, confirmed, cancelled]
+        billing_client_id:
+          type: string
+        billing_client_name:
+          type: string
+        billing_slack_user_id:
+          type: string
+        total_amount:
+          type: integer
+        due_date:
+          type: string
+        bank_details:
+          type: string
+        additional_info:
+          type: string
+        pdf_url:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceItem'
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoryEntry'
+        issuer_slack_user_id:
+          type: string
+        issuer_slack_real_name:
+          type: string
+        paid_amount:
+          type: integer
+        paid_date:
+          type: string
+        paid_method:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    InvoiceListResponse:
+      type: object
+      properties:
+        invoices:
+          type: array
+          items:
+            $ref: '#/components/schemas/Invoice'
+        next_key:
+          type: string

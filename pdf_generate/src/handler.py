@@ -1,44 +1,93 @@
 import json
 import logging
-import r2
-import invoice_generator
 import os
+import invoice_generator
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+
 
 def lambda_handler(event, context):
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
-    
-    logger.info("Processing request...")
-    print(event)
-    
-    # 一時ファイルのパス
-    file_path = "/tmp/invoice.pdf"
 
-    invoice_generator_instance = invoice_generator.InvoiceGenerator()
-    invoice_generator_instance.generate_invoice(
-        payer_name="株式会社〇〇",
-        sender_name="株式会社△△",
-        invoice_amount=100000,
-        deadline="2024/12/31",
-        invoice_details=[
-            ["2024/11/01", "商品A", "10", "1,000", "10,000", "サンプル内容"],
-            ["2024/11/02", "商品B", "5", "2,000", "10,000", "サンプル内容"],
-        ],
-        payment_method="銀行振込",
-        payment_account="〇〇銀行 △△支店 普通 1234567",
-        remarks="お支払いに関するご質問はご連絡ください。",
-        output_file=file_path
-    )
-        
-    # Cloudflare R2 にアップロード
-    upload_url = r2.upload_to_cloudflare(file_path)
-    
-    if upload_url:
-        response_message = {"message": "File uploaded successfully!", "url": upload_url}
-    else:
-        response_message = {"message": "File upload failed."}
-    
+    logger.info("Processing PDF generation request...")
+
+    slack_client = WebClient(token=os.environ.get('SLACK_TOKEN'))
+
+    for record in event.get('Records', []):
+        try:
+            message = json.loads(record['body'])
+            invoice_data = {k: v for k, v in message.items() if k != 'billing_client_slack_user_id'}
+            billing_client_slack_user_id = message.get('billing_client_slack_user_id', '')
+            logger.info(f"Processing invoice: {invoice_data.get('invoice_id')}")
+
+            invoice_id = invoice_data.get('invoice_id', 'unknown')
+            safe_filename = "".join(c for c in invoice_id if c.isalnum() or c in ('-', '_'))
+            file_path = f"/tmp/{safe_filename}.pdf"
+
+            # 品目データの変換
+            items = invoice_data.get('items', [])
+            invoice_details = []
+            for item in items:
+                invoice_details.append([
+                    item.get('date', ''),
+                    item.get('description', ''),
+                    str(item.get('quantity', 0)),
+                    str(item.get('unit_price', 0)),
+                    str(item.get('amount', 0)),
+                    item.get('memo', '')
+                ])
+
+            # デフォルト品目（品目がない場合）
+            if not invoice_details:
+                invoice_details = [
+                    ['', '請求金額', '1', str(invoice_data.get('total_amount', 0)), str(invoice_data.get('total_amount', 0)), '']
+                ]
+
+            # PDF生成
+            gen = invoice_generator.InvoiceGenerator()
+            gen.generate_invoice(
+                payer_name=invoice_data.get('billing_client_name', ''),
+                sender_name=invoice_data.get('issuer_slack_real_name', ''),
+                invoice_amount=invoice_data.get('total_amount', 0),
+                deadline=invoice_data.get('due_date', ''),
+                invoice_details=invoice_details,
+                payment_method='銀行振込',
+                payment_account=invoice_data.get('bank_details', ''),
+                remarks=invoice_data.get('additional_info', ''),
+                output_file=file_path
+            )
+
+            # Slack DMでPDFファイルを送信
+            if billing_client_slack_user_id:
+                try:
+                    # ファイルをアップロード（チャンネル指定なし）
+                    upload_result = slack_client.files_upload_v2(
+                        file=file_path,
+                        title=f"請求書 {invoice_id}",
+                    )
+                    file_url = upload_result['file']['permalink']
+                    # chat:writeスコープでDM送信
+                    slack_client.chat_postMessage(
+                        channel=billing_client_slack_user_id,
+                        text=f"請求書 {invoice_id} のPDFです。\n{file_url}",
+                    )
+                    logger.info(f"PDF sent via Slack DM to {billing_client_slack_user_id} for invoice: {invoice_id}")
+                except SlackApiError as e:
+                    logger.error(f"Failed to send PDF via Slack DM: {e}")
+                    raise
+            else:
+                logger.warning(f"No billing client Slack user ID for invoice: {invoice_id}, skipping Slack DM")
+
+            # ローカルファイルのクリーンアップ
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+        except Exception as e:
+            logger.error(f"Error processing record: {e}")
+            raise
+
     return {
         "statusCode": 200,
-        "body": json.dumps(response_message)
+        "body": json.dumps({"message": "PDF generation completed"})
     }

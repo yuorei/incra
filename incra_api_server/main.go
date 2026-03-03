@@ -25,8 +25,8 @@ func init() {
 
 	// CORS対応を追加
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"http://localhost:3000"},
-		AllowMethods: []string{echo.GET, echo.PUT, echo.POST, echo.DELETE},
+		AllowOrigins: []string{"http://localhost:3000", "http://localhost:5173", os.Getenv("WEB_BASE_URL")},
+		AllowMethods: []string{echo.GET, echo.PUT, echo.POST, echo.DELETE, echo.PATCH},
 	}))
 
 	server := ui.NewServerImpl()
@@ -34,6 +34,8 @@ func init() {
 	// Slackイベントを受け取るエンドポイント
 	e.POST("/slack/events", server.SlackEventsHandler)
 	e.POST("/slack/slashs", server.SlackSlashsHandler)
+	e.POST("/slack/interactions", server.SlackInteractionHandler)
+	e.GET("/slack/users", server.SlackUsersHandler)
 
 	petstore.RegisterHandlers(e, server)
 
