@@ -169,10 +169,9 @@ func validateStatusTransition(from, to domain.InvoiceStatus) error {
 func validatePermission(invoice domain.Invoice, targetStatus domain.InvoiceStatus, changedByUserId string) error {
 	switch targetStatus {
 	case domain.InvoiceStatusPaid:
-		// todo: 動作確認のために一時的に制限解除
-		// if changedByUserId == invoice.IssuerSlackUserId {
-		// 	return fmt.Errorf("自分が発行した請求書に対して支払い報告はできません。受取人のみが操作できます。")
-		// }
+		if changedByUserId == invoice.IssuerSlackUserId {
+			return fmt.Errorf("自分が発行した請求書に対して支払い報告はできません。受取人のみが操作できます。")
+		}
 	case domain.InvoiceStatusConfirmed:
 		if changedByUserId != invoice.IssuerSlackUserId {
 			return fmt.Errorf("支払いの承認は請求書の発行者のみが操作できます。")

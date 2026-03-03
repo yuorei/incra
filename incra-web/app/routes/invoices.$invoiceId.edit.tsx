@@ -183,6 +183,7 @@ export default function InvoiceEdit({ loaderData, actionData }: Route.ComponentP
               <SlackUserSelect
                 users={slackUsers}
                 defaultUserId={invoice.billing_slack_user_id}
+                excludeUserId={loaderData.user.id}
                 onSelect={setSelectedUser}
               />
             </div>

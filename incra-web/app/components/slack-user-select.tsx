@@ -11,10 +11,11 @@ export type SlackUser = {
 type Props = {
   users: SlackUser[];
   defaultUserId?: string;
+  excludeUserId?: string;
   onSelect: (user: SlackUser | null) => void;
 };
 
-export function SlackUserSelect({ users, defaultUserId, onSelect }: Props) {
+export function SlackUserSelect({ users, defaultUserId, excludeUserId, onSelect }: Props) {
   const defaultUser = defaultUserId
     ? users.find((u) => u.id === defaultUserId) ?? null
     : null;
@@ -34,6 +35,7 @@ export function SlackUserSelect({ users, defaultUserId, onSelect }: Props) {
   }, []);
 
   const filtered = users.filter((u) => {
+    if (excludeUserId && u.id === excludeUserId) return false;
     const q = query.toLowerCase();
     return (
       u.name.toLowerCase().includes(q) ||

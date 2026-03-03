@@ -73,6 +73,11 @@ func (s *ServerImpl) CreateInvoice(ctx echo.Context) error {
 		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "billing_slack_user_id is required"})
 	}
 
+	issuerSlackUserId := ctx.Request().Header.Get("X-Slack-User-Id")
+	if req.BillingSlackUserId == issuerSlackUserId {
+		return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "自分自身に請求することはできません"})
+	}
+
 	invoice := domain.Invoice{
 		BillingClientId:     billingClientId,
 		BillingClientName:   billingClientName,
@@ -81,7 +86,7 @@ func (s *ServerImpl) CreateInvoice(ctx echo.Context) error {
 		BankDetails:         req.BankDetails,
 		AdditionalInfo:      additionalInfo,
 		Items:               items,
-		IssuerSlackUserId:   ctx.Request().Header.Get("X-Slack-User-Id"),
+		IssuerSlackUserId:   issuerSlackUserId,
 		IssuerSlackRealName: ctx.Request().Header.Get("X-Slack-User-Name"),
 	}
 
@@ -152,6 +157,9 @@ func (s *ServerImpl) UpdateInvoice(ctx echo.Context, invoiceId string) error {
 		invoice.BillingClientName = *req.BillingClientName
 	}
 	if req.BillingSlackUserId != nil {
+		if *req.BillingSlackUserId == ctx.Request().Header.Get("X-Slack-User-Id") {
+			return ctx.JSON(http.StatusBadRequest, map[string]string{"error": "自分自身に請求することはできません"})
+		}
 		invoice.BillingSlackUserId = *req.BillingSlackUserId
 	}
 	if req.DueDate != nil {

@@ -136,6 +136,7 @@ export default function InvoicesNew({ loaderData, actionData }: Route.ComponentP
               </label>
               <SlackUserSelect
                 users={slackUsers}
+                excludeUserId={loaderData.user.id}
                 onSelect={setSelectedUser}
               />
             </div>
