@@ -134,7 +134,7 @@ cd incra-web && npm run deploy
 # 本番環境
 cd infra/environments/prod
 terraform init
-terraform fmt -check -recursive ../../
+terraform fmt -check -recursive ../../  # infra全体をチェック
 terraform validate
 terraform plan
 
@@ -188,7 +188,7 @@ terraform plan
   - Go Lambda（API Server + Reminder）とPython Lambda（PDF Generator）をビルド
   - AWS OIDC認証 → Terraform apply -auto-approve
   - Terraform stateはS3バックエンド（`incra-terraform-state`）+ DynamoDBロック（`incra-terraform-locks`）
-- Terraform fmt checkが含まれる（`terraform fmt -check -recursive`）
+- Terraform fmt checkが含まれる（`working-directory: infra` で `terraform fmt -check -recursive .` を実行し、modules含む全体をチェック）
 
 ## Coding Conventions
 

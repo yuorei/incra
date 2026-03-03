@@ -53,8 +53,8 @@ jobs:
       # Terraform Formatの確認
       - name: Terraform Format
         id: fmt
-        run: terraform fmt -check -recursive
-        working-directory: infra/environments/prod
+        run: terraform fmt -check -recursive .
+        working-directory: infra
 
       # Terraform Initの実行
       - name: Terraform Init
