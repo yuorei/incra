@@ -11,6 +11,10 @@ on:
       - infra/**
       - .github/workflows/deploy.yaml
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   id-token: write
   contents: read
