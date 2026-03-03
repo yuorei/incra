@@ -280,7 +280,7 @@ resource "aws_cloudwatch_log_group" "api_gateway" {
 module "reminder_schedule" {
   source = "../../modules/eventbridge"
 
-  schedule_name = "incra-reminder-daily"
+  schedule_name       = "incra-reminder-daily"
   schedule_expression = "cron(0 0 * * ? *)"
   target_lambda_arn   = module.reminder_lambda.function_arn
 }
