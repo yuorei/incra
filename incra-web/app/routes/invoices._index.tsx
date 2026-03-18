@@ -3,6 +3,7 @@ import type { Route } from "./+types/invoices._index";
 import { getSession } from "../lib/session";
 import { apiFetch } from "../lib/api";
 import { AuthHeader } from "../components/auth-header";
+import { SlackUserCell, type SlackUser } from "../components/slack-user-select";
 
 type Invoice = {
   invoice_id: string;
@@ -51,15 +52,22 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (type === "received") params.set("type", "received");
   const query = params.toString() ? `?${params.toString()}` : "";
 
-  const res = await apiFetch(env, session, `/invoices${query}`);
-  if (!res.ok) return { invoices: [] as Invoice[], user: session };
-  const data = await res.json() as { invoices?: Invoice[]; next_key?: string };
+  const [invoicesRes, slackUsersRes] = await Promise.all([
+    apiFetch(env, session, `/invoices${query}`),
+    apiFetch(env, session, "/slack/users").catch(() => null),
+  ]);
+  if (!invoicesRes.ok) return { invoices: [] as Invoice[], slackUsers: [] as SlackUser[], user: session };
+  const data = await invoicesRes.json() as { invoices?: Invoice[]; next_key?: string };
   const invoices: Invoice[] = data.invoices || [];
-  return { invoices, user: session };
+  let slackUsers: SlackUser[] = [];
+  if (slackUsersRes?.ok) {
+    slackUsers = await slackUsersRes.json();
+  }
+  return { invoices, slackUsers, user: session };
 }
 
 export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
-  const { invoices } = loaderData;
+  const { invoices, slackUsers } = loaderData;
   const [searchParams] = useSearchParams();
   const currentStatus = searchParams.get("status") || "";
   const currentType = searchParams.get("type") || "";
@@ -136,49 +144,84 @@ export default function InvoicesIndex({ loaderData }: Route.ComponentProps) {
         {invoices.length === 0 ? (
           <p className="text-gray-500 dark:text-gray-400">請求書がありません。</p>
         ) : (
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700">
-                <tr>
-                  <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">請求書ID</th>
-                  {isReceived ? (
-                    <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">発行者</th>
-                  ) : (
-                    <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">請求先</th>
-                  )}
-                  <th className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">合計金額</th>
-                  <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">期限</th>
-                  <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">ステータス</th>
-                  <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((inv) => (
-                  <tr key={inv.invoice_id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-4 py-3 text-gray-900 dark:text-gray-100 font-mono text-xs">{inv.invoice_id.slice(0, 8)}</td>
-                    <td className="px-4 py-3 text-gray-900 dark:text-gray-100">
-                      {isReceived
-                        ? (inv.issuer_slack_real_name || inv.issuer_slack_user_id || "-")
-                        : (inv.billing_client_name || inv.billing_slack_user_id || inv.billing_client_id || "-")
-                      }
-                    </td>
-                    <td className="px-4 py-3 text-right text-gray-900 dark:text-gray-100 font-medium">{formatYen(inv.total_amount)}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{inv.due_date}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[inv.status] || "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"}`}>
-                        {STATUS_LABELS[inv.status] || inv.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link to={`/invoices/${inv.invoice_id}`} className="text-blue-600 dark:text-blue-400 hover:underline">
-                        詳細
-                      </Link>
-                    </td>
+          <>
+            {/* Mobile: card layout */}
+            <div className="sm:hidden flex flex-col gap-3">
+              {invoices.map((inv) => (
+                <Link
+                  key={inv.invoice_id}
+                  to={`/invoices/${inv.invoice_id}`}
+                  className="block bg-white dark:bg-gray-800 shadow rounded-lg px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-700 active:bg-gray-100"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="font-mono text-xs text-gray-500 dark:text-gray-400">{inv.invoice_id.slice(0, 8)}</span>
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[inv.status] || "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"}`}>
+                      {STATUS_LABELS[inv.status] || inv.status}
+                    </span>
+                  </div>
+                  <div className="mb-2">
+                    {isReceived
+                      ? <SlackUserCell userId={inv.issuer_slack_user_id} users={slackUsers} />
+                      : inv.billing_slack_user_id
+                        ? <SlackUserCell userId={inv.billing_slack_user_id} users={slackUsers} />
+                        : <span className="text-gray-900 dark:text-gray-100">{inv.billing_client_name || inv.billing_client_id || "-"}</span>
+                    }
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500 dark:text-gray-400 text-xs">期限: {inv.due_date}</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{formatYen(inv.total_amount)}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* Desktop: table layout */}
+            <div className="hidden sm:block bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-900 border-b dark:border-gray-700">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">請求書ID</th>
+                    {isReceived ? (
+                      <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">発行者</th>
+                    ) : (
+                      <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">請求先</th>
+                    )}
+                    <th className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">合計金額</th>
+                    <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">期限</th>
+                    <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">ステータス</th>
+                    <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400">操作</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {invoices.map((inv) => (
+                    <tr key={inv.invoice_id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-4 py-3 text-gray-900 dark:text-gray-100 font-mono text-xs">{inv.invoice_id.slice(0, 8)}</td>
+                      <td className="px-4 py-3">
+                        {isReceived
+                          ? <SlackUserCell userId={inv.issuer_slack_user_id} users={slackUsers} />
+                          : inv.billing_slack_user_id
+                            ? <SlackUserCell userId={inv.billing_slack_user_id} users={slackUsers} />
+                            : <span className="text-gray-900 dark:text-gray-100">{inv.billing_client_name || inv.billing_client_id || "-"}</span>
+                        }
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-900 dark:text-gray-100 font-medium">{formatYen(inv.total_amount)}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{inv.due_date}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[inv.status] || "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"}`}>
+                          {STATUS_LABELS[inv.status] || inv.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link to={`/invoices/${inv.invoice_id}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                          詳細
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </main>
     </div>

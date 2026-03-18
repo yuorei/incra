@@ -559,6 +559,7 @@ type SlackUser struct {
 	RealName     string `json:"real_name"`
 	DisplayName  string `json:"display_name"`
 	ProfileImage string `json:"profile_image"`
+	TeamID       string `json:"team_id"`
 }
 
 func (s *ServerImpl) SlackUsersHandler(c echo.Context) error {
@@ -581,6 +582,7 @@ func (s *ServerImpl) SlackUsersHandler(c echo.Context) error {
 			RealName:     u.RealName,
 			DisplayName:  u.Profile.DisplayName,
 			ProfileImage: u.Profile.Image48,
+			TeamID:       u.TeamID,
 		})
 	}
 
