@@ -6,6 +6,7 @@ export type SlackUser = {
   real_name: string;
   display_name: string;
   profile_image: string;
+  team_id?: string;
 };
 
 type Props = {
@@ -14,6 +15,35 @@ type Props = {
   excludeUserId?: string;
   onSelect: (user: SlackUser | null) => void;
 };
+
+export function SlackUserCell({ userId, users }: { userId?: string; users: SlackUser[] }) {
+  if (!userId) return <span className="text-gray-400">-</span>;
+  const user = users.find((u) => u.id === userId);
+  if (!user) return <span className="font-mono text-xs text-gray-500">{userId}</span>;
+  const displayName = user.display_name || user.real_name || user.name;
+  const href = user.team_id
+    ? `slack://user?team=${user.team_id}&id=${user.id}`
+    : undefined;
+  const inner = (
+    <>
+      <img src={user.profile_image} alt="" className="w-7 h-7 rounded-full shrink-0" />
+      <div className="min-w-0">
+        <div className="text-sm text-gray-900 dark:text-gray-100 font-medium truncate">{displayName}</div>
+        {user.real_name && user.display_name && user.real_name !== user.display_name && (
+          <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.real_name}</div>
+        )}
+      </div>
+    </>
+  );
+  if (href) {
+    return (
+      <a href={href} className="flex items-center gap-2 hover:opacity-80">
+        {inner}
+      </a>
+    );
+  }
+  return <div className="flex items-center gap-2">{inner}</div>;
+}
 
 export function SlackUserSelect({ users, defaultUserId, excludeUserId, onSelect }: Props) {
   const defaultUser = defaultUserId

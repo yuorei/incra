@@ -2,6 +2,8 @@ import { redirect, Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/invoices.$invoiceId";
 import { getSession } from "../lib/session";
 import { apiFetch } from "../lib/api";
+import { AuthHeader } from "../components/auth-header";
+import { SlackUserCell, type SlackUser } from "../components/slack-user-select";
 
 type InvoiceItem = {
   date: string;
@@ -61,10 +63,17 @@ export async function loader({ request, context, params }: Route.LoaderArgs) {
   const session = await getSession(request, env.SESSION_SECRET);
   if (!session) throw redirect("/login");
 
-  const res = await apiFetch(env, session, `/invoices/${params.invoiceId}`);
-  if (!res.ok) throw redirect("/invoices");
-  const invoice: Invoice = await res.json();
-  return { invoice, user: session };
+  const [invoiceRes, slackUsersRes] = await Promise.all([
+    apiFetch(env, session, `/invoices/${params.invoiceId}`),
+    apiFetch(env, session, "/slack/users").catch(() => null),
+  ]);
+  if (!invoiceRes.ok) throw redirect("/invoices");
+  const invoice: Invoice = await invoiceRes.json();
+  let slackUsers: SlackUser[] = [];
+  if (slackUsersRes?.ok) {
+    slackUsers = await slackUsersRes.json();
+  }
+  return { invoice, slackUsers, user: session };
 }
 
 export async function action({ request, context, params }: Route.ActionArgs) {
@@ -94,21 +103,14 @@ export async function action({ request, context, params }: Route.ActionArgs) {
 }
 
 export default function InvoiceDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { invoice, user } = loaderData;
+  const { invoice, slackUsers, user } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const isIssuer = user.id === invoice.issuer_slack_user_id;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <nav className="flex gap-4 items-center">
-            <Link to="/" className="text-xl font-bold text-gray-800 dark:text-white">incra</Link>
-            <Link to="/invoices" className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-semibold">請求書</Link>
-          </nav>
-        </div>
-      </header>
+      <AuthHeader user={user} />
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300">請求書詳細</h2>
@@ -146,7 +148,10 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
             </div>
             <div>
               <span className="text-xs text-gray-500 dark:text-gray-400">請求先</span>
-              <p className="text-sm text-gray-900 dark:text-gray-100">{invoice.billing_client_name || invoice.billing_slack_user_id || invoice.billing_client_id || "-"}</p>
+              {invoice.billing_slack_user_id
+                ? <SlackUserCell userId={invoice.billing_slack_user_id} users={slackUsers} />
+                : <p className="text-sm text-gray-900 dark:text-gray-100">{invoice.billing_client_name || invoice.billing_client_id || "-"}</p>
+              }
             </div>
             <div>
               <span className="text-xs text-gray-500 dark:text-gray-400">支払期限</span>
@@ -320,8 +325,21 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
                         {STATUS_LABELS[entry.new_status] || entry.new_status}
                       </span>
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {entry.changed_at} - {entry.changed_by}
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
+                      {entry.changed_at}
+                      {" - "}
+                      {(() => {
+                        const u = slackUsers.find((u) => u.id === entry.changed_by);
+                        if (u) {
+                          return (
+                            <span className="inline-flex items-center gap-1">
+                              <img src={u.profile_image} alt="" className="w-4 h-4 rounded-full" />
+                              {u.display_name || u.real_name || u.name}
+                            </span>
+                          );
+                        }
+                        return entry.changed_by;
+                      })()}
                     </p>
                   </div>
                 </div>
