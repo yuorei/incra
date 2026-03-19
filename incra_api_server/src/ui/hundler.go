@@ -321,9 +321,9 @@ func buildInvoiceModalView(meta SlackModalMetadata) (slack.ModalViewRequest, err
 		return slack.ModalViewRequest{}, fmt.Errorf("failed to marshal modal metadata: %w", err)
 	}
 
-	billingUserElement := &slack.SelectBlockElement{
-		Type:        "users_select",
-		Placeholder: slack.NewTextBlockObject(slack.PlainTextType, "担当者を選択", false, false),
+	billingUserElement := &slack.MultiSelectBlockElement{
+		Type:        slack.MultiOptTypeUser,
+		Placeholder: slack.NewTextBlockObject(slack.PlainTextType, "担当者を選択（複数可）", false, false),
 		ActionID:    "billing_user_action",
 	}
 	billingUserSelect := slack.NewInputBlock(
@@ -443,8 +443,8 @@ func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.Inte
 		meta.ItemCount = 1
 	}
 
-	// 請求先
-	billingUser := values["billing_user_block"]["billing_user_action"].SelectedUser
+	// 請求先（複数選択）
+	billingUsers := values["billing_user_block"]["billing_user_action"].SelectedUsers
 
 	// 支払期限
 	dueDate := values["due_date_block"]["due_date_action"].SelectedDate
@@ -498,42 +498,63 @@ func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.Inte
 	issuerSlackUserId := meta.IssuerID
 	issuerSlackRealName := interaction.User.Name
 
-	invoice := domain.Invoice{
-		BillingSlackUserId:  billingUser,
-		BillingClientName:   "",
-		DueDate:             dueDate,
-		BankDetails:         bankDetails,
-		AdditionalInfo:      additionalInfo,
-		IssuerSlackUserId:   issuerSlackUserId,
-		IssuerSlackRealName: issuerSlackRealName,
-		Items:               items,
-	}
+	webBaseURL := os.Getenv("WEB_BASE_URL")
 
-	created, err := s.invoiceUseCase.CreateInvoice(invoice)
-	if err != nil {
-		fmt.Printf("failed to create invoice: %v\n", err)
-		return c.String(http.StatusOK, "")
-	}
+	// 請求先ごとに請求書を作成・送付
+	var createdInvoiceIds []string
+	var failedUsers []string
+	for _, billingUser := range billingUsers {
+		if billingUser == issuerSlackUserId {
+			continue
+		}
 
-	// ステータスをsentに遷移
-	sent, err := s.invoiceUseCase.TransitionStatus(created.InvoiceId, domain.InvoiceStatusSent, issuerSlackRealName, issuerSlackUserId)
-	if err != nil {
-		fmt.Printf("warning: failed to transition invoice to sent: %v\n", err)
-		sent = created
-	}
+		invoice := domain.Invoice{
+			BillingSlackUserId:  billingUser,
+			BillingClientName:   "",
+			DueDate:             dueDate,
+			BankDetails:         bankDetails,
+			AdditionalInfo:      additionalInfo,
+			IssuerSlackUserId:   issuerSlackUserId,
+			IssuerSlackRealName: issuerSlackRealName,
+			Items:               items,
+		}
 
-	// 請求先担当者にDM通知（ボタン付き）
-	if billingUser != "" {
+		created, err := s.invoiceUseCase.CreateInvoice(invoice)
+		if err != nil {
+			fmt.Printf("failed to create invoice for %s: %v\n", billingUser, err)
+			failedUsers = append(failedUsers, fmt.Sprintf("<@%s>", billingUser))
+			continue
+		}
+
+		// ステータスをsentに遷移
+		sent, err := s.invoiceUseCase.TransitionStatus(created.InvoiceId, domain.InvoiceStatusSent, issuerSlackRealName, issuerSlackUserId)
+		if err != nil {
+			fmt.Printf("warning: failed to transition invoice to sent: %v\n", err)
+			sent = created
+		}
+
+		// 請求先担当者にDM通知（ボタン付き）
 		if err := infrastructure.SendInvoiceNotificationWithPayButton(billingUser, sent); err != nil {
 			fmt.Printf("warning: failed to send billing user notification DM: %v\n", err)
 		}
+
+		createdInvoiceIds = append(createdInvoiceIds, fmt.Sprintf("<%s/invoices/%s|%s>（<@%s>宛）", webBaseURL, sent.InvoiceId, sent.InvoiceId, billingUser))
 	}
 
-	webBaseURL := os.Getenv("WEB_BASE_URL")
-	message := fmt.Sprintf("請求書を作成・送付しました\n• 請求書ID: %s\n• 取引先: <@%s>\n• 合計金額: ¥%s\n• 支払期限: %s\n<%s/invoices/%s|請求書を確認する>",
-		sent.InvoiceId, sent.BillingSlackUserId, formatAmount(sent.TotalAmount), sent.DueDate, webBaseURL, sent.InvoiceId)
+	var messageParts []string
+	if len(createdInvoiceIds) > 0 {
+		messageParts = append(messageParts, fmt.Sprintf("請求書を%d件作成・送付しました\n%s", len(createdInvoiceIds), strings.Join(createdInvoiceIds, "\n")))
+	}
+	if len(failedUsers) > 0 {
+		messageParts = append(messageParts, fmt.Sprintf("以下の請求先への請求書作成に失敗しました: %s", strings.Join(failedUsers, ", ")))
+	}
 
-	_, _, err = api.PostMessage(issuerSlackUserId, slack.MsgOptionText(message, false))
+	if len(messageParts) == 0 {
+		return c.String(http.StatusOK, "")
+	}
+
+	// 発行者に作成結果をDM通知
+	_, _, err = api.PostMessage(issuerSlackUserId, slack.MsgOptionText(strings.Join(messageParts, "\n\n"), false))
 	if err != nil {
 		fmt.Printf("failed to send message: %v\n", err)
 	}
