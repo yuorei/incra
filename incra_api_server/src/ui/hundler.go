@@ -446,6 +446,7 @@ func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.Inte
 
 	// 請求先ごとに請求書を作成・送付
 	var createdInvoiceIds []string
+	var failedUsers []string
 	for _, billingUser := range billingUsers {
 		if billingUser == issuerSlackUserId {
 			continue
@@ -473,6 +474,7 @@ func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.Inte
 		created, err := s.invoiceUseCase.CreateInvoice(invoice)
 		if err != nil {
 			fmt.Printf("failed to create invoice for %s: %v\n", billingUser, err)
+			failedUsers = append(failedUsers, fmt.Sprintf("<@%s>", billingUser))
 			continue
 		}
 
@@ -491,13 +493,20 @@ func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.Inte
 		createdInvoiceIds = append(createdInvoiceIds, fmt.Sprintf("<%s/invoices/%s|%s>（<@%s>宛）", webBaseURL, sent.InvoiceId, sent.InvoiceId, billingUser))
 	}
 
-	if len(createdInvoiceIds) == 0 {
+	var messageParts []string
+	if len(createdInvoiceIds) > 0 {
+		messageParts = append(messageParts, fmt.Sprintf("請求書を%d件作成・送付しました\n%s", len(createdInvoiceIds), strings.Join(createdInvoiceIds, "\n")))
+	}
+	if len(failedUsers) > 0 {
+		messageParts = append(messageParts, fmt.Sprintf("以下の請求先への請求書作成に失敗しました: %s", strings.Join(failedUsers, ", ")))
+	}
+
+	if len(messageParts) == 0 {
 		return c.String(http.StatusOK, "")
 	}
 
-	// 発行者に作成完了をDM通知
-	message := fmt.Sprintf("請求書を%d件作成・送付しました\n%s", len(createdInvoiceIds), strings.Join(createdInvoiceIds, "\n"))
-	_, _, err = api.PostMessage(issuerSlackUserId, slack.MsgOptionText(message, false))
+	// 発行者に作成結果をDM通知
+	_, _, err = api.PostMessage(issuerSlackUserId, slack.MsgOptionText(strings.Join(messageParts, "\n\n"), false))
 	if err != nil {
 		fmt.Printf("failed to send message: %v\n", err)
 	}

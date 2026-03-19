@@ -259,6 +259,7 @@ export function SlackUserMultiSelect({ users, excludeUserId, onSelect }: MultiPr
           }}
           onFocus={() => setIsOpen(true)}
           placeholder={selected.length === 0 ? "ユーザーを検索..." : "追加..."}
+          aria-label="請求先ユーザーを検索"
           className="flex-1 min-w-[120px] bg-transparent dark:text-white text-sm focus:outline-none py-0.5"
         />
       </div>

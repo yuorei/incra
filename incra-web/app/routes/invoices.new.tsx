@@ -40,7 +40,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   const formData = await request.formData();
   const itemCount = parseInt(formData.get("item_count") as string, 10) || 0;
-  const items = [];
+  const items: { date: string; description: string; quantity: number; unit_price: number; amount: number; memo: string }[] = [];
   for (let i = 0; i < itemCount; i++) {
     const quantity = parseInt(formData.get(`items[${i}].quantity`) as string, 10) || 0;
     const unitPrice = parseInt(formData.get(`items[${i}].unit_price`) as string, 10) || 0;
@@ -61,40 +61,47 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   const billingClientNames = formData.getAll("billing_client_name") as string[];
+  const dueDate = formData.get("due_date") as string;
+  const bankDetails = (formData.get("bank_details") as string) || "";
+  const additionalInfo = (formData.get("additional_info") as string) || undefined;
 
-  const errors: string[] = [];
-  let lastCreatedId: string | null = null;
-
-  for (let idx = 0; idx < validIds.length; idx++) {
-    const body = {
-      billing_slack_user_id: validIds[idx],
-      billing_client_name: billingClientNames[idx] ?? "",
-      due_date: formData.get("due_date") as string,
-      bank_details: (formData.get("bank_details") as string) || "",
-      additional_info: (formData.get("additional_info") as string) || undefined,
-      items,
-    };
-
-    const res = await apiFetch(env, session, "/invoices", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      errors.push(`${validIds[idx]}: ${errorText}`);
-    } else {
+  const results = await Promise.all(
+    validIds.map(async (userId, idx) => {
+      const body = {
+        billing_slack_user_id: userId,
+        billing_client_name: billingClientNames[idx] ?? "",
+        due_date: dueDate,
+        bank_details: bankDetails,
+        additional_info: additionalInfo,
+        items,
+      };
+      const res = await apiFetch(env, session, "/invoices", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        return { ok: false as const, userId, error: errorText };
+      }
       const created = (await res.json()) as { invoice_id: string };
-      lastCreatedId = created.invoice_id;
-    }
+      return { ok: true as const, userId, invoiceId: created.invoice_id };
+    })
+  );
+
+  const succeeded = results.filter((r) => r.ok);
+  const failed = results.filter((r) => !r.ok);
+
+  if (succeeded.length === 0) {
+    return { error: `作成に失敗しました: ${failed.map((r) => r.error).join(", ")}` };
   }
 
-  if (errors.length > 0 && lastCreatedId === null) {
-    return { error: `作成に失敗しました: ${errors.join(", ")}` };
+  if (failed.length > 0) {
+    // 一部成功・一部失敗 → 一覧にリダイレクトし、エラーを返す（リダイレクトできないためエラー優先）
+    return { error: `${succeeded.length}件作成済み。${failed.length}件失敗: ${failed.map((r) => r.userId).join(", ")}` };
   }
 
-  if (validIds.length === 1 && lastCreatedId) {
-    throw redirect(`/invoices/${lastCreatedId}`);
+  if (validIds.length === 1 && succeeded[0]?.ok) {
+    throw redirect(`/invoices/${succeeded[0].invoiceId}`);
   }
 
   throw redirect("/invoices");
