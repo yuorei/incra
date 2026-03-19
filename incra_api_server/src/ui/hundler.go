@@ -268,13 +268,57 @@ func (s *ServerImpl) SlackEventsHandler(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
-	slackToken := os.Getenv("SLACK_TOKEN")
-	api := slack.New(slackToken)
+// SlackModalMetadata is the JSON-encoded private metadata for the invoice creation modal.
+type SlackModalMetadata struct {
+	IssuerID  string `json:"issuer_id"`
+	ItemCount int    `json:"item_count"`
+}
 
-	slashCommand, err := slack.SlashCommandParse(c.Request())
+// buildItemInputBlocks creates the three input blocks (品目名/数量/単価) for an item at the given index.
+func buildItemInputBlocks(index int) []slack.Block {
+	prefix := fmt.Sprintf("item_%d", index)
+	label := fmt.Sprintf("品目 %d", index+1)
+
+	descInput := slack.NewInputBlock(
+		prefix+"_desc_block",
+		slack.NewTextBlockObject(slack.PlainTextType, label+" - 品目名", false, false),
+		nil,
+		slack.NewPlainTextInputBlockElement(
+			slack.NewTextBlockObject(slack.PlainTextType, "品目名を入力", false, false),
+			prefix+"_desc_action",
+		),
+	)
+
+	quantityInput := slack.NewInputBlock(
+		prefix+"_quantity_block",
+		slack.NewTextBlockObject(slack.PlainTextType, label+" - 数量", false, false),
+		nil,
+		slack.NewPlainTextInputBlockElement(
+			slack.NewTextBlockObject(slack.PlainTextType, "数量を入力", false, false),
+			prefix+"_quantity_action",
+		),
+	)
+
+	unitPriceInput := slack.NewInputBlock(
+		prefix+"_unit_price_block",
+		slack.NewTextBlockObject(slack.PlainTextType, label+" - 単価", false, false),
+		nil,
+		slack.NewPlainTextInputBlockElement(
+			slack.NewTextBlockObject(slack.PlainTextType, "単価を入力", false, false),
+			prefix+"_unit_price_action",
+		),
+	)
+
+	return []slack.Block{descInput, quantityInput, unitPriceInput}
+}
+
+const invoiceDateFormat = "2006-01-02"
+
+// buildInvoiceModalView builds the full ModalViewRequest for the invoice creation modal.
+func buildInvoiceModalView(meta SlackModalMetadata) (slack.ModalViewRequest, error) {
+	metaJSON, err := json.Marshal(meta)
 	if err != nil {
-		return err
+		return slack.ModalViewRequest{}, fmt.Errorf("failed to marshal modal metadata: %w", err)
 	}
 
 	billingUserElement := &slack.SelectBlockElement{
@@ -307,36 +351,6 @@ func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
 		),
 	)
 
-	itemDescInput := slack.NewInputBlock(
-		"item_desc_block",
-		slack.NewTextBlockObject(slack.PlainTextType, "品目名", false, false),
-		nil,
-		slack.NewPlainTextInputBlockElement(
-			slack.NewTextBlockObject(slack.PlainTextType, "品目名を入力", false, false),
-			"item_desc_action",
-		),
-	)
-
-	itemQuantityInput := slack.NewInputBlock(
-		"item_quantity_block",
-		slack.NewTextBlockObject(slack.PlainTextType, "数量", false, false),
-		nil,
-		slack.NewPlainTextInputBlockElement(
-			slack.NewTextBlockObject(slack.PlainTextType, "数量を入力", false, false),
-			"item_quantity_action",
-		),
-	)
-
-	itemUnitPriceInput := slack.NewInputBlock(
-		"item_unit_price_block",
-		slack.NewTextBlockObject(slack.PlainTextType, "単価", false, false),
-		nil,
-		slack.NewPlainTextInputBlockElement(
-			slack.NewTextBlockObject(slack.PlainTextType, "単価を入力", false, false),
-			"item_unit_price_action",
-		),
-	)
-
 	additionalInfoInput := slack.NewInputBlock(
 		"additional_info_block",
 		slack.NewTextBlockObject(slack.PlainTextType, "備考", false, false),
@@ -348,23 +362,40 @@ func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
 	)
 	additionalInfoInput.Optional = true
 
-	modalView := slack.ModalViewRequest{
-		Type:   slack.VTModal,
-		Title:  slack.NewTextBlockObject(slack.PlainTextType, "請求書作成", false, false),
-		Submit: slack.NewTextBlockObject(slack.PlainTextType, "作成", false, false),
-		Close:  slack.NewTextBlockObject(slack.PlainTextType, "キャンセル", false, false),
-		Blocks: slack.Blocks{
-			BlockSet: []slack.Block{
-				billingUserSelect,
-				dueDatePicker,
-				bankDetailsInput,
-				itemDescInput,
-				itemQuantityInput,
-				itemUnitPriceInput,
-				additionalInfoInput,
-			},
-		},
-		PrivateMetadata: slashCommand.UserID,
+	blocks := []slack.Block{billingUserSelect, dueDatePicker, bankDetailsInput}
+	for i := 0; i < meta.ItemCount; i++ {
+		blocks = append(blocks, buildItemInputBlocks(i)...)
+	}
+
+	addItemButton := slack.NewButtonBlockElement("add_item_action", "add_item",
+		slack.NewTextBlockObject(slack.PlainTextType, "＋ アイテムを追加", false, false))
+	blocks = append(blocks, slack.NewActionBlock("add_item_actions_block", addItemButton))
+	blocks = append(blocks, additionalInfoInput)
+
+	return slack.ModalViewRequest{
+		Type:            slack.VTModal,
+		Title:           slack.NewTextBlockObject(slack.PlainTextType, "請求書作成", false, false),
+		Submit:          slack.NewTextBlockObject(slack.PlainTextType, "作成", false, false),
+		Close:           slack.NewTextBlockObject(slack.PlainTextType, "キャンセル", false, false),
+		Blocks:          slack.Blocks{BlockSet: blocks},
+		PrivateMetadata: string(metaJSON),
+	}, nil
+}
+
+func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
+	slackToken := os.Getenv("SLACK_TOKEN")
+	api := slack.New(slackToken)
+
+	slashCommand, err := slack.SlashCommandParse(c.Request())
+	if err != nil {
+		return err
+	}
+
+	meta := SlackModalMetadata{IssuerID: slashCommand.UserID, ItemCount: 1}
+	modalView, err := buildInvoiceModalView(meta)
+	if err != nil {
+		fmt.Printf("failed to build modal: %v\n", err)
+		return c.JSON(http.StatusOK, map[string]string{"text": "モーダルの構築に失敗しました"})
 	}
 
 	_, err = api.OpenView(slashCommand.TriggerID, modalView)
@@ -403,6 +434,15 @@ func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.Inte
 
 	values := interaction.View.State.Values
 
+	// PrivateMetadata を JSON パース（旧形式: 単なるユーザーID文字列にも対応）
+	var meta SlackModalMetadata
+	if err := json.Unmarshal([]byte(interaction.View.PrivateMetadata), &meta); err != nil {
+		meta = SlackModalMetadata{IssuerID: interaction.View.PrivateMetadata, ItemCount: 1}
+	}
+	if meta.ItemCount <= 0 {
+		meta.ItemCount = 1
+	}
+
 	// 請求先
 	billingUser := values["billing_user_block"]["billing_user_action"].SelectedUser
 
@@ -412,34 +452,50 @@ func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.Inte
 	// 振込先
 	bankDetails := values["bank_details_block"]["bank_details_action"].Value
 
-	// 明細
-	itemDesc := values["item_desc_block"]["item_desc_action"].Value
-	quantityStr := values["item_quantity_block"]["item_quantity_action"].Value
-	unitPriceStr := values["item_unit_price_block"]["item_unit_price_action"].Value
+	// 明細（複数アイテム）
+	validationErrors := map[string]string{}
+	items := make([]domain.InvoiceItem, 0, meta.ItemCount)
+	today := time.Now().Format(invoiceDateFormat)
+	for i := 0; i < meta.ItemCount; i++ {
+		descKey := fmt.Sprintf("item_%d_desc_block", i)
+		quantityKey := fmt.Sprintf("item_%d_quantity_block", i)
+		unitPriceKey := fmt.Sprintf("item_%d_unit_price_block", i)
 
-	quantity, err := strconv.Atoi(quantityStr)
-	if err != nil {
-		errResp := slack.NewErrorsViewSubmissionResponse(map[string]string{
-			"item_quantity_block": "数量は数値で入力してください",
+		desc := values[descKey][fmt.Sprintf("item_%d_desc_action", i)].Value
+		quantityStr := values[quantityKey][fmt.Sprintf("item_%d_quantity_action", i)].Value
+		unitPriceStr := values[unitPriceKey][fmt.Sprintf("item_%d_unit_price_action", i)].Value
+
+		quantity, err := strconv.Atoi(quantityStr)
+		if err != nil {
+			// 全アイテムのエラーを収集してから一度に返すため continue する
+			validationErrors[quantityKey] = "数量は数値で入力してください"
+			continue
+		}
+		unitPrice, err := strconv.Atoi(unitPriceStr)
+		if err != nil {
+			// 全アイテムのエラーを収集してから一度に返すため continue する
+			validationErrors[unitPriceKey] = "単価は数値で入力してください"
+			continue
+		}
+		items = append(items, domain.InvoiceItem{
+			Date:        today,
+			Description: desc,
+			Quantity:    quantity,
+			UnitPrice:   unitPrice,
+			Amount:      quantity * unitPrice,
 		})
-		return c.JSON(http.StatusOK, errResp)
 	}
 
-	unitPrice, err := strconv.Atoi(unitPriceStr)
-	if err != nil {
-		errResp := slack.NewErrorsViewSubmissionResponse(map[string]string{
-			"item_unit_price_block": "単価は数値で入力してください",
-		})
+	if len(validationErrors) > 0 {
+		errResp := slack.NewErrorsViewSubmissionResponse(validationErrors)
 		return c.JSON(http.StatusOK, errResp)
 	}
-
-	amount := quantity * unitPrice
 
 	// 備考
 	additionalInfo := values["additional_info_block"]["additional_info_action"].Value
 
 	// 発行者情報
-	issuerSlackUserId := interaction.View.PrivateMetadata
+	issuerSlackUserId := meta.IssuerID
 	issuerSlackRealName := interaction.User.Name
 
 	invoice := domain.Invoice{
@@ -450,15 +506,7 @@ func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.Inte
 		AdditionalInfo:      additionalInfo,
 		IssuerSlackUserId:   issuerSlackUserId,
 		IssuerSlackRealName: issuerSlackRealName,
-		Items: []domain.InvoiceItem{
-			{
-				Date:        time.Now().Format("2006-01-02"),
-				Description: itemDesc,
-				Quantity:    quantity,
-				UnitPrice:   unitPrice,
-				Amount:      amount,
-			},
-		},
+		Items:               items,
 	}
 
 	created, err := s.invoiceUseCase.CreateInvoice(invoice)
@@ -510,6 +558,23 @@ func (s *ServerImpl) handleBlockActions(c echo.Context, interaction slack.Intera
 	var successMessage string
 
 	switch action.ActionID {
+	case "add_item_action":
+		var meta SlackModalMetadata
+		if err := json.Unmarshal([]byte(interaction.View.PrivateMetadata), &meta); err != nil {
+			// 旧形式（ユーザーIDのみの文字列）にも対応
+			meta = SlackModalMetadata{IssuerID: interaction.View.PrivateMetadata, ItemCount: 1}
+		}
+		meta.ItemCount++
+		updatedModal, err := buildInvoiceModalView(meta)
+		if err != nil {
+			fmt.Printf("failed to build updated modal: %v\n", err)
+			return c.String(http.StatusOK, "")
+		}
+		_, err = api.UpdateView(updatedModal, "", interaction.View.Hash, interaction.View.ID)
+		if err != nil {
+			fmt.Printf("failed to update modal: %v\n", err)
+		}
+		return c.String(http.StatusOK, "")
 	case "mark_paid":
 		targetStatus = domain.InvoiceStatusPaid
 		successMessage = fmt.Sprintf("請求書 %s の支払いを報告しました", invoiceId)
