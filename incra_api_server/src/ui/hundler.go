@@ -554,7 +554,7 @@ func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.Inte
 	}
 
 	// 発行者に作成結果をDM通知
-	_, _, err = api.PostMessage(issuerSlackUserId, slack.MsgOptionText(strings.Join(messageParts, "\n\n"), false))
+	_, _, err := api.PostMessage(issuerSlackUserId, slack.MsgOptionText(strings.Join(messageParts, "\n\n"), false))
 	if err != nil {
 		fmt.Printf("failed to send message: %v\n", err)
 	}
