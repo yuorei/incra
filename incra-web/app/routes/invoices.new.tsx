@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { Route } from "./+types/invoices.new";
 import { getSession } from "../lib/session";
 import { apiFetch } from "../lib/api";
-import { SlackUserSelect, type SlackUser } from "../components/slack-user-select";
+import { SlackUserMultiSelect, type SlackUser } from "../components/slack-user-select";
 import { AuthHeader } from "../components/auth-header";
 
 type ItemRow = {
@@ -54,32 +54,50 @@ export async function action({ request, context }: Route.ActionArgs) {
     });
   }
 
-  const billingSlackUserId = formData.get("billing_slack_user_id") as string;
-  if (!billingSlackUserId) {
+  const billingSlackUserIds = formData.getAll("billing_slack_user_id") as string[];
+  const validIds = billingSlackUserIds.filter(Boolean);
+  if (validIds.length === 0) {
     return { error: "請求先を選択してください" };
   }
 
-  const body = {
-    billing_slack_user_id: billingSlackUserId,
-    billing_client_name: formData.get("billing_client_name") as string,
-    due_date: formData.get("due_date") as string,
-    bank_details: (formData.get("bank_details") as string) || "",
-    additional_info: (formData.get("additional_info") as string) || undefined,
-    items,
-  };
+  const billingClientNames = formData.getAll("billing_client_name") as string[];
 
-  const res = await apiFetch(env, session, "/invoices", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  const errors: string[] = [];
+  let lastCreatedId: string | null = null;
 
-  if (!res.ok) {
-    const error = await res.text();
-    return { error: `作成に失敗しました: ${error}` };
+  for (let idx = 0; idx < validIds.length; idx++) {
+    const body = {
+      billing_slack_user_id: validIds[idx],
+      billing_client_name: billingClientNames[idx] ?? "",
+      due_date: formData.get("due_date") as string,
+      bank_details: (formData.get("bank_details") as string) || "",
+      additional_info: (formData.get("additional_info") as string) || undefined,
+      items,
+    };
+
+    const res = await apiFetch(env, session, "/invoices", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      errors.push(`${validIds[idx]}: ${errorText}`);
+    } else {
+      const created = (await res.json()) as { invoice_id: string };
+      lastCreatedId = created.invoice_id;
+    }
   }
 
-  const created = (await res.json()) as { invoice_id: string };
-  throw redirect(`/invoices/${created.invoice_id}`);
+  if (errors.length > 0 && lastCreatedId === null) {
+    return { error: `作成に失敗しました: ${errors.join(", ")}` };
+  }
+
+  if (validIds.length === 1 && lastCreatedId) {
+    throw redirect(`/invoices/${lastCreatedId}`);
+  }
+
+  throw redirect("/invoices");
 }
 
 let nextKey = 1;
@@ -88,7 +106,7 @@ export default function InvoicesNew({ loaderData, actionData }: Route.ComponentP
   const { slackUsers } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
-  const [selectedUser, setSelectedUser] = useState<SlackUser | null>(null);
+  const [selectedUsers, setSelectedUsers] = useState<SlackUser[]>([]);
 
   const [items, setItems] = useState<ItemRow[]>([
     { key: nextKey++, date: "", description: "", quantity: 1, unit_price: 0, memo: "" },
@@ -121,17 +139,22 @@ export default function InvoicesNew({ loaderData, actionData }: Route.ComponentP
         )}
         <Form method="post" className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 space-y-6">
           <input type="hidden" name="item_count" value={items.length} />
-          <input type="hidden" name="billing_slack_user_id" value={selectedUser?.id ?? ""} />
-          <input type="hidden" name="billing_client_name" value={selectedUser?.real_name ?? ""} />
+          {selectedUsers.map((u) => (
+            <input key={u.id} type="hidden" name="billing_slack_user_id" value={u.id} />
+          ))}
+          {selectedUsers.map((u) => (
+            <input key={`name_${u.id}`} type="hidden" name="billing_client_name" value={u.real_name} />
+          ))}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 請求先 <span className="text-red-500">*</span>
+                <span className="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">（複数選択可）</span>
               </label>
-              <SlackUserSelect
+              <SlackUserMultiSelect
                 users={slackUsers}
                 excludeUserId={loaderData.user.id}
-                onSelect={setSelectedUser}
+                onSelect={setSelectedUsers}
               />
             </div>
             <div>
