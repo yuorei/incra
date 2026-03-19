@@ -391,20 +391,108 @@ func (s *ServerImpl) SlackSlashsHandler(c echo.Context) error {
 		return err
 	}
 
+	subcommand := strings.TrimSpace(strings.ToLower(slashCommand.Text))
+	switch subcommand {
+	case "", "new":
+		return s.handleSlashNew(c, api, slashCommand)
+	case "help":
+		return s.handleSlashHelp(c, slashCommand.Command)
+	case "list", "issued":
+		return s.handleSlashIssued(c, slashCommand.UserID)
+	case "received", "pay":
+		return s.handleSlashReceived(c, slashCommand.UserID)
+	case "unpaid":
+		return s.handleSlashUnpaid(c, slashCommand.UserID)
+	case "summary":
+		return s.handleSlashSummary(c, slashCommand.UserID)
+	default:
+		return s.handleSlashUnknown(c, slashCommand.Text)
+	}
+}
+
+func (s *ServerImpl) handleSlashNew(c echo.Context, api *slack.Client, slashCommand slack.SlashCommand) error {
 	meta := SlackModalMetadata{IssuerID: slashCommand.UserID, ItemCount: 1}
 	modalView, err := buildInvoiceModalView(meta)
 	if err != nil {
 		fmt.Printf("failed to build modal: %v\n", err)
 		return c.JSON(http.StatusOK, map[string]string{"text": "モーダルの構築に失敗しました"})
 	}
-
 	_, err = api.OpenView(slashCommand.TriggerID, modalView)
 	if err != nil {
 		fmt.Printf("failed to open modal: %v\n", err)
 		return c.JSON(http.StatusOK, map[string]string{"text": "モーダルの表示に失敗しました"})
 	}
-
 	return c.String(http.StatusOK, "")
+}
+
+func (s *ServerImpl) handleSlashHelp(c echo.Context, cmd string) error {
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"response_type": "ephemeral",
+		"blocks":        infrastructure.BuildHelpBlocks(cmd),
+	})
+}
+
+func (s *ServerImpl) handleSlashIssued(c echo.Context, userID string) error {
+	webBaseURL := os.Getenv("WEB_BASE_URL")
+	invoices, _, err := s.invoiceUseCase.ListInvoices(userID, "", 5, "")
+	if err != nil {
+		return c.JSON(http.StatusOK, map[string]string{"text": "請求書の取得に失敗しました"})
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"response_type": "ephemeral",
+		"blocks":        infrastructure.BuildIssuedListBlocks(invoices, webBaseURL),
+	})
+}
+
+func (s *ServerImpl) handleSlashReceived(c echo.Context, userID string) error {
+	webBaseURL := os.Getenv("WEB_BASE_URL")
+	invoices, _, err := s.invoiceUseCase.ListReceivedInvoices(userID, "sent", 5, "")
+	if err != nil {
+		return c.JSON(http.StatusOK, map[string]string{"text": "請求書の取得に失敗しました"})
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"response_type": "ephemeral",
+		"blocks":        infrastructure.BuildReceivedListBlocks(invoices, webBaseURL),
+	})
+}
+
+func (s *ServerImpl) handleSlashUnpaid(c echo.Context, userID string) error {
+	webBaseURL := os.Getenv("WEB_BASE_URL")
+	sent, _, err := s.invoiceUseCase.ListInvoices(userID, "sent", 100, "")
+	if err != nil {
+		return c.JSON(http.StatusOK, map[string]string{"text": "請求書の取得に失敗しました"})
+	}
+	paid, _, err := s.invoiceUseCase.ListInvoices(userID, "paid", 100, "")
+	if err != nil {
+		return c.JSON(http.StatusOK, map[string]string{"text": "請求書の取得に失敗しました"})
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"response_type": "ephemeral",
+		"blocks":        infrastructure.BuildUnpaidBlocks(sent, paid, webBaseURL),
+	})
+}
+
+func (s *ServerImpl) handleSlashSummary(c echo.Context, userID string) error {
+	webBaseURL := os.Getenv("WEB_BASE_URL")
+	issued, _, err := s.invoiceUseCase.ListInvoices(userID, "", 100, "")
+	if err != nil {
+		return c.JSON(http.StatusOK, map[string]string{"text": "請求書の取得に失敗しました"})
+	}
+	received, _, err := s.invoiceUseCase.ListReceivedInvoices(userID, "", 100, "")
+	if err != nil {
+		return c.JSON(http.StatusOK, map[string]string{"text": "請求書の取得に失敗しました"})
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"response_type": "ephemeral",
+		"blocks":        infrastructure.BuildSummaryBlocks(issued, received, webBaseURL),
+	})
+}
+
+func (s *ServerImpl) handleSlashUnknown(c echo.Context, text string) error {
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"response_type": "ephemeral",
+		"blocks":        infrastructure.BuildUnknownCommandBlocks(text),
+	})
 }
 
 func (s *ServerImpl) SlackInteractionHandler(c echo.Context) error {
