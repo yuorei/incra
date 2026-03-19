@@ -481,12 +481,9 @@ func (s *ServerImpl) handleViewSubmission(c echo.Context, interaction slack.Inte
 		}
 	}
 
-	clientDisplay := sent.BillingClientName
-	if clientDisplay == "" {
-		clientDisplay = "未指定"
-	}
-	message := fmt.Sprintf("請求書を作成・送付しました\n• 請求書ID: %s\n• 取引先: %s\n• 合計金額: ¥%s\n• 支払期限: %s",
-		sent.InvoiceId, clientDisplay, formatAmount(sent.TotalAmount), sent.DueDate)
+	webBaseURL := os.Getenv("WEB_BASE_URL")
+	message := fmt.Sprintf("請求書を作成・送付しました\n• 請求書ID: %s\n• 取引先: <@%s>\n• 合計金額: ¥%s\n• 支払期限: %s\n<%s/invoices/%s|請求書を確認する>",
+		sent.InvoiceId, sent.BillingSlackUserId, formatAmount(sent.TotalAmount), sent.DueDate, webBaseURL, sent.InvoiceId)
 
 	_, _, err = api.PostMessage(issuerSlackUserId, slack.MsgOptionText(message, false))
 	if err != nil {
