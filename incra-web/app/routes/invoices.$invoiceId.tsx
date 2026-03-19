@@ -5,6 +5,26 @@ import { apiFetch } from "../lib/api";
 import { AuthHeader } from "../components/auth-header";
 import { SlackUserCell, type SlackUser } from "../components/slack-user-select";
 
+function renderTextWithLinks(text: string) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+      >
+        {part}
+      </a>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
+
 type InvoiceItem = {
   date: string;
   description: string;
@@ -171,7 +191,9 @@ export default function InvoiceDetail({ loaderData, actionData }: Route.Componen
           {invoice.additional_info && (
             <div className="mb-4">
               <span className="text-xs text-gray-500 dark:text-gray-400">備考</span>
-              <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">{invoice.additional_info}</p>
+              <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                {renderTextWithLinks(invoice.additional_info)}
+              </p>
             </div>
           )}
           {invoice.pdf_url && (
