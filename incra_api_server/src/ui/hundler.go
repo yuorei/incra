@@ -261,6 +261,14 @@ func (s *ServerImpl) SlackEventsHandler(c echo.Context) error {
 					return err
 				}
 			}
+		case *slackevents.AppHomeOpenedEvent:
+			if event.Tab == "home" {
+				webBaseURL := os.Getenv("WEB_BASE_URL")
+				homeView := infrastructure.BuildHomeTabView(webBaseURL)
+				if _, err := api.PublishView(event.User, homeView, ""); err != nil {
+					fmt.Printf("failed to publish home tab view: %v\n", err)
+				}
+			}
 		}
 
 	}
@@ -667,6 +675,18 @@ func (s *ServerImpl) handleBlockActions(c echo.Context, interaction slack.Intera
 	var successMessage string
 
 	switch action.ActionID {
+	case "open_invoice_modal":
+		meta := SlackModalMetadata{IssuerID: changedByUserId, ItemCount: 1}
+		modalView, err := buildInvoiceModalView(meta)
+		if err != nil {
+			fmt.Printf("failed to build modal: %v\n", err)
+			return c.String(http.StatusOK, "")
+		}
+		_, err = api.OpenView(interaction.TriggerID, modalView)
+		if err != nil {
+			fmt.Printf("failed to open modal from home tab: %v\n", err)
+		}
+		return c.String(http.StatusOK, "")
 	case "add_item_action":
 		var meta SlackModalMetadata
 		if err := json.Unmarshal([]byte(interaction.View.PrivateMetadata), &meta); err != nil {
