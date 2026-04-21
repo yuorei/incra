@@ -7,13 +7,19 @@ from reportlab.pdfbase import pdfmetrics
 from datetime import datetime
 from typing import List
 import os
+import re
+
+
+def _sanitize(text: str) -> str:
+    """絵文字など IPA明朝未収録の文字（Supplementary Multilingual Plane: U+10000以上）を除去する。"""
+    return ''.join(c for c in text if ord(c) <= 0xFFFF)
 
 class InvoiceGenerator:
     def __init__(self):
         self.font = os.getenv('FONT_NAME')
-        self.font_path =os.getenv('FONT_PATH')
+        self.font_path = os.getenv('FONT_PATH')
         print(self.font, self.font_path,"フォントを読み込みました")
-        
+
         pdfmetrics.registerFont(TTFont(self.font, self.font_path))
 
     @staticmethod
@@ -49,12 +55,12 @@ class InvoiceGenerator:
 
         # Payer
         c.setFont(self.font, 12)
-        c.drawString(50, height - 100, f"{payer_name} 御中")
+        c.drawString(50, height - 100, f"{_sanitize(payer_name)} 御中")
         c.drawString(50, height - 130, "下記の通り、ご請求申し上げます")
 
         # Invoice Amount
         c.setFont(self.font, 14)
-        c.drawString(50, height - 180, f"ご請求金額 ￥{self.format_amount(invoice_amount)}")
+        c.drawString(50, height - 180, f"ご請求金額 ¥{self.format_amount(invoice_amount)}")
         c.line(50, height - 185, 200, height - 185)
 
         # Payment Deadline
@@ -63,7 +69,7 @@ class InvoiceGenerator:
 
         # Sender Info
         c.setFont(self.font, 18)
-        c.drawRightString(width - 50, height - 180, sender_name)
+        c.drawRightString(width - 50, height - 180, _sanitize(sender_name))
 
         # Table Data
         header = ["取引日付", "内容", "数量", "単価", "金額", "概要"]
@@ -86,7 +92,7 @@ class InvoiceGenerator:
         # Total Amount
         total_amount = sum(int(row[4].replace(",", "")) for row in invoice_details)
         total_table = Table(
-            [["合計金額", f"￥{self.format_amount(total_amount)}"]],
+            [["合計金額", f"¥{self.format_amount(total_amount)}"]],
             colWidths=[150, table_width - 150],
             rowHeights=30
         )
