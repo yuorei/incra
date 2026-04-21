@@ -2,6 +2,7 @@ import os
 import sys
 import unittest
 import tempfile
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
@@ -61,9 +62,13 @@ class TestFormatDate(unittest.TestCase):
 
 class TestGenerateInvoice(unittest.TestCase):
     def setUp(self):
-        os.environ['FONT_NAME'] = 'IPAexMincho'
-        os.environ['FONT_PATH'] = os.path.join(os.path.dirname(__file__), '..', 'src', 'ipam.ttf')
+        font_path = os.path.join(os.path.dirname(__file__), '..', 'src', 'ipam.ttf')
+        self._env_patcher = patch.dict(os.environ, {'FONT_NAME': 'IPAexMincho', 'FONT_PATH': font_path})
+        self._env_patcher.start()
         self.gen = InvoiceGenerator()
+
+    def tearDown(self):
+        self._env_patcher.stop()
 
     def test_generates_pdf_file(self):
         with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:

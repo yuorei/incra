@@ -7,7 +7,6 @@ from reportlab.pdfbase import pdfmetrics
 from datetime import datetime
 from typing import List
 import os
-import re
 
 
 def _sanitize(text: str) -> str:
@@ -73,7 +72,8 @@ class InvoiceGenerator:
 
         # Table Data
         header = ["取引日付", "内容", "数量", "単価", "金額", "概要"]
-        data = [header] + invoice_details
+        sanitized_details = [[_sanitize(cell) if isinstance(cell, str) else cell for cell in row] for row in invoice_details]
+        data = [header] + sanitized_details
         x_offset, y_offset = 50, 350
         table_width = width - 100
         details_table = Table(data, colWidths=[70, 100, 50, 70, 70, 100], rowHeights=25)
@@ -110,7 +110,7 @@ class InvoiceGenerator:
 
         # Payment Information
         payment_table = Table(
-            [[payment_method, payment_account]],
+            [[payment_method, _sanitize(payment_account)]],
             colWidths=[150, table_width - 150],
             rowHeights=30
         )
@@ -128,7 +128,7 @@ class InvoiceGenerator:
         # Remarks
         if remarks:
             remarks_table = Table(
-                [["備考", remarks]],
+                [["備考", _sanitize(remarks)]],
                 colWidths=[150, table_width - 150],
                 rowHeights=45
             )
