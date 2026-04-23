@@ -386,6 +386,65 @@ func BuildUnknownCommandBlocks(text string) []slacklib.Block {
 	}
 }
 
+func BuildHomeTabView(webBaseURL string) slacklib.HomeTabViewRequest {
+	headerBlock := slacklib.NewHeaderBlock(
+		slacklib.NewTextBlockObject(slacklib.PlainTextType, "Incra - 請求書管理", false, false),
+	)
+
+	descSection := slacklib.NewSectionBlock(
+		slacklib.NewTextBlockObject(slacklib.MarkdownType,
+			"Slackから請求書の発行・管理ができます。\n`/incra help` でコマンド一覧を確認できます。",
+			false, false),
+		nil, nil,
+	)
+
+	issueBtn := slacklib.NewButtonBlockElement(
+		"open_invoice_modal",
+		"open_invoice_modal",
+		slacklib.NewTextBlockObject(slacklib.PlainTextType, "請求書を発行する", false, false),
+	)
+	issueBtn.Style = slacklib.StylePrimary
+
+	actionsBlock := slacklib.NewActionBlock("home_actions", issueBtn)
+
+	divider := slacklib.NewDividerBlock()
+
+	webLinksHeader := slacklib.NewSectionBlock(
+		slacklib.NewTextBlockObject(slacklib.MarkdownType, "*Webアプリで確認する*", false, false),
+		nil, nil,
+	)
+
+	issuedBtn := slacklib.NewButtonBlockElement(
+		"web_issued",
+		"web_issued",
+		slacklib.NewTextBlockObject(slacklib.PlainTextType, "発行した請求書", false, false),
+	)
+	issuedBtn.URL = webBaseURL + "/invoices?type=issued"
+
+	receivedBtn := slacklib.NewButtonBlockElement(
+		"web_received",
+		"web_received",
+		slacklib.NewTextBlockObject(slacklib.PlainTextType, "受領した請求書", false, false),
+	)
+	receivedBtn.URL = webBaseURL + "/invoices?type=received"
+
+	newInvoiceBtn := slacklib.NewButtonBlockElement(
+		"web_new",
+		"web_new",
+		slacklib.NewTextBlockObject(slacklib.PlainTextType, "Web画面で請求書作成", false, false),
+	)
+	newInvoiceBtn.URL = webBaseURL + "/invoices/new"
+
+	webLinksBlock := slacklib.NewActionBlock("home_web_links", issuedBtn, receivedBtn, newInvoiceBtn)
+
+	return slacklib.HomeTabViewRequest{
+		Type: slacklib.VTHomeTab,
+		Blocks: slacklib.Blocks{
+			BlockSet: []slacklib.Block{headerBlock, descSection, actionsBlock, divider, webLinksHeader, webLinksBlock},
+		},
+	}
+}
+
 func slackFormatAmount(amount int) string {
 	s := strconv.Itoa(amount)
 	n := len(s)
